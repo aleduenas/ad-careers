@@ -1,0 +1,34 @@
+{
+  "name": "career-ops",
+  "version": "1.8.0",
+  "description": "Local dashboard-first job-search workflows with PostgreSQL and isolated subscription CLI workers",
+  "scripts": {
+    "test": "node src/test-all.mjs",
+    "verify": "node src/helpers/verify-pipeline.mjs",
+    "pdf": "node src/cvgen/generate-pdf.mjs",
+    "scan": "node src/scan/scan.mjs",
+    "verify:portals": "node src/helpers/verify-portals.mjs",
+    "inspect": "node src/helpers/inspect-pipeline.mjs",
+    "draft:cv": "node src/cvgen/draft-cv.mjs",
+    "db:up": "node src/helpers/db-infra.mjs up",
+    "db:down": "node src/helpers/db-infra.mjs down",
+    "db:migrate": "node src/helpers/db-migrate.mjs",
+    "db:audit": "node src/helpers/import-legacy.mjs",
+    "db:backup": "node src/helpers/db-infra.mjs backup",
+    "db:schema": "node src/helpers/db-schema.mjs",
+    "test:database": "node src/helpers/test-database.mjs",
+    "db:test": "node src/helpers/db-test.mjs",
+    "db:cutover": "node src/helpers/db-cutover.mjs",
+    "format": "prettier --write \"src/**/*.mjs\"",
+    "format:check": "prettier --check \"src/**/*.mjs\""
+  },
+  "license": "MIT",
+  "dependencies": {
+    "js-yaml": "^4.1.1",
+    "pg": "^8.23.0",
+    "playwright": "^1.58.1"
+  },
+  "devDependencies": {
+    "prettier": "^3.9.8"
+  }
+}

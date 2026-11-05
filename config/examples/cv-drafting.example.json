@@ -1,0 +1,11 @@
+{
+  "default_provider": "claude",
+  "claude_command": "claude",
+  "claude_model": "sonnet",
+  "codex_command": "codex",
+  "codex_model": "",
+  "timeout_ms": 600000,
+  "drafting_root": "logs/drafting",
+  "max_repairs": 2,
+  "max_pages": 2
+}

@@ -1,0 +1,23 @@
+name: PostgreSQL and dashboard
+on: [push, pull_request]
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: dashboard/go.mod
+          cache-dependency-path: dashboard/go.sum
+      - run: npm ci
+      - run: node src/helpers/db-schema.mjs --check
+      - run: node src/helpers/db-infra.mjs init
+      - run: node src/helpers/db-infra.mjs up
+      - run: npx playwright install --with-deps chromium
+      - run: node src/helpers/db-test.mjs
+      - run: node src/cvgen/test-pdf-render.mjs --render
+      - if: always()
+        run: node src/helpers/db-infra.mjs down

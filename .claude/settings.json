@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Read",
+      "Write",
+      "Edit",
+      "WebFetch",
+      "WebSearch",
+      "Bash(node:*)",
+      "Bash(ls:*)",
+      "Bash(cat:*)",
+      "Bash(sort:*)",
+      "Bash(tail:*)",
+      "Bash(head:*)",
+      "Bash(mkdir:*)"
+    ]
+  }
+}

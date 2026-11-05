@@ -1,0 +1,31 @@
+# Copy to config/portals.yml, configure boards, then enable selected entries.
+# Run node src/helpers/verify-portals.mjs and node src/scan/scan.mjs --dry-run.
+# No automatic search-engine fallback exists. Paste a full JD for unsupported sites.
+title_filter:
+  positive: ["Engineer", "Analyst"]
+  negative: ["Intern", "Director"]
+# Optional substring prefilter; the Toronto/remote-Canada gate also runs.
+location_filter:
+  allow: ["Toronto", "Canada", "Remote"]
+  block: []
+tracked_companies:
+  - name: Example Ashby board
+    provider: ashby
+    careers_url: https://jobs.ashbyhq.com/replace-board
+    ashby_board: replace-board
+    enabled: false
+  - name: Example Greenhouse board
+    provider: greenhouse
+    careers_url: https://job-boards.greenhouse.io/replace-board
+    api: https://boards-api.greenhouse.io/v1/boards/replace-board/jobs
+    enabled: false
+  - name: hiring.cafe discovery
+    provider: hiring-cafe
+    search_roles: ["data engineer"]
+    search_cache_ttl_hours: 12
+    search_cache_fallback_days: 14
+    enabled: false
+  - name: Manual discovery only
+    careers_url: https://example.test/careers
+    scan_class: rich-only
+    enabled: false

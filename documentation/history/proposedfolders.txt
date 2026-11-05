@@ -1,0 +1,62 @@
+root
+-src
+--helpers
+---scripts that do stuff like the sql migration or similar
+--actual backend function
+---cv gen (folder or file. i prefer higher granularity for scalability. just not sure if anything would go in here if it was a folder vs a file)
+---eval
+---job scanner rich and regular
+---etc...
+-infra
+--sql stuff
+---schema1
+---schema2
+--docker
+-llm folder backend (idk if its still going to be .agents or what? i want to make sure we have a separate folder for backend llm working on the project vs functional llm doing the work the project is intended for like the eval and cv gen)
+-dashboard
+-llm folder functions
+--prompts
+---cv gen
+----cvgen prompt1, 2,  etc..
+---eval
+---etc..
+--compacted docs
+---compacted cv
+---compacted anything else (rubric? idk whatever other file that we have as regular formatting for me but want less tokens for llm ingestion)
+-config
+--my profile who i am what i want
+--my cv
+--
+-data -> most if not all of this should be in the database no? lets keep whatevers in the repo here for now and i'll deal with it later. at the least lets just organize it
+--company info
+--JDs
+--evaluations (i think currently stored as reports)
+--interview prep (this shouldn't be in the database so this is a good reason to make and keep this folder)
+---role
+----all the prep for that role
+-output
+--company name
+---role
+----CV (if exists)
+----cover letter (if exists)
+----
+---role 2
+----CV (if exists)
+----cover letter (if exists)
+----
+--company 2
+---role
+----CV (if exists)
+----cover letter (if exists)
+-logs
+--dashboard logs
+--eval
+--cv gen
+--etc...
+-documentation
+--index
+--folder 1 from above
+---each page from that folder
+--folder 2 etc..
+-readme
+

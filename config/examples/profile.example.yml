@@ -1,0 +1,9 @@
+# Copy to config/profile.yml. Only renderer identity belongs here.
+# Targeting belongs in config/profile.md and llm/compacted/candidate-targeting.md.
+candidate:
+  full_name: "Example Candidate"
+  email: "candidate@example.test"
+  phone: ""
+  linkedin: ""
+  github: ""
+  spoken_languages: ""  # optional, shown last in the CV contact row, e.g. "Fluent in English and French"

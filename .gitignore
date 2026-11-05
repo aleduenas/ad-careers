@@ -1,0 +1,67 @@
+# --- Candidate material and runtime settings (private) ---
+# config/ holds personal documents (profile.md, cv.md, cv-guidance.md) and private
+# runtime settings (profile.yml, portals.yml, *.json). Only the examples and README are tracked.
+config/*
+!config/README.md
+!config/examples/
+!config/examples/**
+
+# Token-cheap versions of config documents read by LLM workers
+llm/compacted/
+# Live style inputs contain personal rules (see data/writing-samples/MANIFEST.md)
+llm/prompts/cvgen/writing-style-guide.txt
+llm/prompts/cvgen/cover-letter-paragraph-worksheet.txt
+
+# --- Work product and caches (private) ---
+data/*
+!data/.gitkeep
+!data/evaluations/
+data/evaluations/*
+!data/evaluations/.gitkeep
+output/*
+!output/.gitkeep
+!data/jds/
+data/jds/*
+!data/jds/.gitkeep
+!data/interview-prep/
+data/interview-prep/*
+!data/interview-prep/story-bank.template.md
+!data/writing-samples/
+data/writing-samples/*
+!data/writing-samples/README.md
+*.bak
+
+# --- Generated ---
+logs/
+.playwright-mcp/
+
+# --- Build artifacts ---
+dashboard/dashboard.exe
+dashboard/dashboard
+dashboard/*.exe
+dashboard/*.exe~
+dashboard/dash.lnk
+dashboard/launch-log.txt
+
+# --- Secrets ---
+.env
+.env.*
+!.env.example
+!documentation/**/.env.md
+infra/docker/.env
+
+# --- Dependencies ---
+node_modules/
+bun.lock
+
+# --- OS ---
+.DS_Store
+*.mov
+*.mp4
+
+# --- Claude Code local ---
+.claude/settings.local.json
+/.agents/
+/.codex/
+/.aws/
+/.tmp-go-cache/
