@@ -6,6 +6,8 @@ inputs are described by contract only. See [layout](guides/layout.md) and [index
 
 ## Backend
 
+- [src/helpers/discord-terminal](src/helpers/discord-terminal.md)
+- [src/helpers/test-discord-terminal](src/helpers/test-discord-terminal.md)
 - [src/analytics/analyze-patterns](src/analytics/analyze-patterns.md)
 - [src/analytics/followup-cadence](src/analytics/followup-cadence.md)
 - [src/analytics/test-analyze-patterns](src/analytics/test-analyze-patterns.md)
@@ -39,6 +41,12 @@ inputs are described by contract only. See [layout](guides/layout.md) and [index
 - [src/helpers/db-migrate](src/helpers/db-migrate.md)
 - [src/helpers/db-schema](src/helpers/db-schema.md)
 - [src/helpers/db-test](src/helpers/db-test.md)
+- [src/helpers/discord-lead](src/helpers/discord-lead.md)
+- [src/helpers/discord-message](src/helpers/discord-message.md)
+- [src/helpers/_discord-lead](src/helpers/_discord-lead.md)
+- [src/helpers/_discord-channel](src/helpers/_discord-channel.md)
+- [src/helpers/Start-DiscordLead](src/helpers/Start-DiscordLead.md)
+- [src/helpers/Start-ClaudeLead](src/helpers/Start-ClaudeLead.md)
 - [src/helpers/import-legacy](src/helpers/import-legacy.md)
 - [src/helpers/inspect-pipeline](src/helpers/inspect-pipeline.md)
 - [src/helpers/job-update](src/helpers/job-update.md)
@@ -48,6 +56,7 @@ inputs are described by contract only. See [layout](guides/layout.md) and [index
 - [src/helpers/sync-jds](src/helpers/sync-jds.md)
 - [src/helpers/test-backup-restore](src/helpers/test-backup-restore.md)
 - [src/helpers/test-database](src/helpers/test-database.md)
+- [src/helpers/test-discord-lead](src/helpers/test-discord-lead.md)
 - [src/helpers/test-legacy-import](src/helpers/test-legacy-import.md)
 - [src/helpers/test-prune-logs](src/helpers/test-prune-logs.md)
 - [src/helpers/verify-pipeline](src/helpers/verify-pipeline.md)
@@ -88,6 +97,36 @@ inputs are described by contract only. See [layout](guides/layout.md) and [index
 - [src/scan/test-workable](src/scan/test-workable.md)
 - [src/scan/test-workday](src/scan/test-workday.md)
 - [src/test-all](src/test-all.md)
+
+## Browser API
+
+- [src/server/app](src/server/app.md)
+- [src/server/generate-types](src/server/generate-types.md)
+- [src/server/jobs-compensation](src/server/jobs-compensation.md)
+- [src/server/jobs-materials](src/server/jobs-materials.md)
+- [src/server/jobs-paths](src/server/jobs-paths.md)
+- [src/server/jobs-read](src/server/jobs-read.md)
+- [src/server/readiness](src/server/readiness.md)
+- [src/server/schemas](src/server/schemas.md)
+- [src/server/test-app](src/server/test-app.md)
+- [src/server/test-jobs-database](src/server/test-jobs-database.md)
+- [src/server/test-jobs-read](src/server/test-jobs-read.md)
+- [src/server/static](src/server/static.md)
+- [src/server/start](src/server/start.md)
+- [src/server/test-static](src/server/test-static.md)
+- [src/server/test-start](src/server/test-start.md)
+
+## Browser frontend
+
+- [web/index](web/index.md)
+- [web/src/App](web/src/App.md)
+- [web/src/api](web/src/api.md)
+- [web/src/main](web/src/main.md)
+- [web/src/styles](web/src/styles.md)
+- [web/test-api](web/test-api.md)
+- [web/test-support/fixture-server](web/test-support/fixture-server.md)
+- [web/tsconfig](web/tsconfig.md)
+- [web/vite.config](web/vite.config.md)
 
 ## LLM inputs and prompts
 

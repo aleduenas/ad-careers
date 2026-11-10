@@ -22,6 +22,18 @@ import { tmpdir } from 'os';
 
 const SRC_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT = dirname(SRC_DIR);
+const WEB_DIR = join(ROOT, 'web');
+const WEB_IGNORED_DIRS = new Set([
+  'node_modules',
+  'dist',
+  'generated',
+  '.vite',
+  '.cache',
+  '.tmp',
+  'coverage',
+  'playwright-report',
+  'test-results',
+]);
 // Every .mjs under src/, relative to ROOT, discovered recursively.
 function walkMjs(dir, rel = 'src') {
   const out = [];
@@ -32,7 +44,29 @@ function walkMjs(dir, rel = 'src') {
   return out;
 }
 const ALL_MJS = walkMjs(SRC_DIR);
+function walkWebFiles(dir, rel = 'web') {
+  if (!existsSync(dir)) return [];
+  const out = [];
+  for (const entry of readdirSync(dir, { withFileTypes: true })) {
+    if (entry.isDirectory()) {
+      if (!WEB_IGNORED_DIRS.has(entry.name))
+        out.push(...walkWebFiles(join(dir, entry.name), rel + '/' + entry.name));
+    } else if (
+      /\.(css|html|json|jsx|mjs|ts|tsx)$/.test(entry.name) &&
+      !entry.name.endsWith('.d.ts')
+    ) {
+      out.push(rel + '/' + entry.name);
+    }
+  }
+  return out;
+}
+const ALL_WEB_FILES = walkWebFiles(WEB_DIR);
+const WEB_MJS = ALL_WEB_FILES.filter(path => path.endsWith('.mjs'));
 const QUICK = process.argv.includes('--quick');
+const NPM_SCRIPTS = Object.freeze({
+  webTypecheck: 'web:typecheck',
+  webBuild: 'web:build',
+});
 
 let passed = 0;
 let failed = 0;
@@ -68,6 +102,16 @@ function run(cmd, args = [], opts = {}) {
   }
 }
 
+// Invoke fixed, trusted npm scripts; Windows needs cmd.exe for npm's .cmd shim.
+function runNpmScript(script, opts = {}) {
+  if (!Object.values(NPM_SCRIPTS).includes(script))
+    throw new Error(`Unsupported npm script in test harness: ${script}`);
+  const command = `npm run ${script}`;
+  return process.platform === 'win32'
+    ? run(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', command], opts)
+    : run('npm', ['run', script], opts);
+}
+
 function fileExists(path) {
   return existsSync(join(ROOT, path));
 }
@@ -81,7 +125,7 @@ console.log('\n🧪 career-ops test suite\n');
 
 console.log('1. Syntax checks');
 
-const mjsFiles = ALL_MJS;
+const mjsFiles = [...ALL_MJS, ...WEB_MJS];
 for (const f of mjsFiles) {
   const result = run('node', ['--check', f]);
   if (result !== null) {
@@ -96,9 +140,9 @@ for (const f of mjsFiles) {
 console.log('\n2. Script execution (dry-run — never mutates user data)');
 
 // Tests are discovered: every src/**/test-*.mjs except this harness.
-const scripts = ALL_MJS.filter(
-  f => /\/test-[^/]+\.mjs$/.test(f) && !f.endsWith('test-all.mjs'),
-).map(name => ({ name, args: [] }));
+const scripts = [...ALL_MJS, ...WEB_MJS]
+  .filter(f => /\/test-[^/]+\.mjs$/.test(f) && !f.endsWith('test-all.mjs'))
+  .map(name => ({ name, args: [] }));
 
 for (const { name, args } of scripts) {
   const result = run('node', [join(ROOT, name), ...args], { diagnostics: true });
@@ -116,24 +160,39 @@ for (const { name, args } of scripts) {
   }
 }
 
-// ── 3. DASHBOARD BUILD ──────────────────────────────────────────
+// ── 3. WEB TOOLCHAIN ───────────────────────────────────────────
+
+console.log('\n3. Web toolchain');
+if (QUICK) {
+  const typecheck = runNpmScript(NPM_SCRIPTS.webTypecheck, { diagnostics: true });
+  if (typecheck !== null) pass('Web API type generation and strict typecheck');
+  else fail('Web typecheck failed');
+} else {
+  if (!fileExists('web/index.html')) fail('Web production entrypoint web/index.html is missing');
+  const webBuild = runNpmScript(NPM_SCRIPTS.webBuild, { diagnostics: true, timeout: 180000 });
+  if (webBuild !== null) pass('Web production build (includes API type generation and typecheck)');
+  else fail('Web production build failed');
+}
 
 if (!QUICK) {
-  console.log('\n3. Dashboard build');
+  console.log('\n4. Dashboard build');
   const out = join(tmpdir(), 'career-dashboard-test.exe');
-  const goBuild = run('go', ['build', '-o', out, '.'], { cwd: join(ROOT, 'dashboard') });
+  const goBuild = run('go', ['build', '-o', out, '.'], {
+    cwd: join(ROOT, 'dashboard'),
+    diagnostics: true,
+  });
   if (goBuild !== null) {
     pass('Dashboard compiles');
   } else {
     fail('Dashboard build failed');
   }
 } else {
-  console.log('\n3. Dashboard build (skipped --quick)');
+  console.log('\n4. Dashboard build (skipped --quick)');
 }
 
-// ── 4. DATA CONTRACT ────────────────────────────────────────────
+// ── 5. DATA CONTRACT ────────────────────────────────────────────
 
-console.log('\n4. Data contract validation');
+console.log('\n5. Data contract validation');
 
 // Check system files exist
 const systemFiles = [
@@ -153,6 +212,9 @@ const systemFiles = [
   'src/cvgen/draft-cv.mjs',
   'src/cvgen/_cv-content.mjs',
   'src/cvgen/templates/cv-structured.html',
+  'web/index.html',
+  'web/vite.config.mjs',
+  'web/tsconfig.json',
   'documentation/guides/prompts.md',
   'llm/prompts/cvgen/cv-worksheet.md',
   'llm/prompts/cvgen/cv-repair.md',
@@ -198,9 +260,9 @@ for (const f of userFiles) {
   }
 }
 
-// ── 5. ABSOLUTE PATH CHECK ──────────────────────────────────────
+// ── 6. ABSOLUTE PATH CHECK ──────────────────────────────────────
 
-console.log('\n5. Absolute path check');
+console.log('\n6. Absolute path check');
 
 const absAllowed = ['README.md', 'LICENSE', 'CLAUDE.md', 'src/test-all.mjs'];
 const absPatterns = ['/Users/', 'C:\\\\Users\\\\'];
@@ -213,6 +275,12 @@ for (const pattern of absPatterns) {
     pattern,
     '--',
     '*.mjs',
+    '*.js',
+    '*.jsx',
+    '*.ts',
+    '*.tsx',
+    '*.css',
+    '*.html',
     '*.md',
     '*.go',
     '*.yml',
@@ -230,11 +298,12 @@ if (!absFound) {
   pass('No absolute paths in code files');
 }
 
-// ── 6. DOCUMENTATION COVERAGE ──────────────────────────────────
+// ── 7. DOCUMENTATION COVERAGE ──────────────────────────────────
 
-console.log('\n6. Documentation coverage');
+console.log('\n7. Documentation coverage');
 const documentedRoots = [
   'src',
+  'web',
   'dashboard',
   'infra',
   'llm/prompts',
@@ -248,10 +317,14 @@ const privatePromptInputs = new Set([
 function documentationSources(dir) {
   return readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap(entry => {
     const path = dir + '/' + entry.name;
-    if (entry.isDirectory())
-      return ['node_modules', 'logs'].includes(entry.name) ? [] : documentationSources(path);
+    if (entry.isDirectory()) {
+      const ignoredDirs = new Set(['node_modules', 'logs']);
+      if (dir === 'web' || dir.startsWith('web/'))
+        for (const ignored of WEB_IGNORED_DIRS) ignoredDirs.add(ignored);
+      return ignoredDirs.has(entry.name) ? [] : documentationSources(path);
+    }
     return !privatePromptInputs.has(path) &&
-      (/\.(mjs|go|ps1|sql|yml|json|html|md|woff2)$/.test(path) ||
+      (/\.(mjs|go|ps1|sql|yml|json|html|md|woff2|js|jsx|ts|tsx|css)$/.test(path) ||
         path === 'infra/docker/.env.example')
       ? [path]
       : [];
@@ -267,9 +340,9 @@ if (!missingPages.length)
     `Documentation pages exist for ${documentationSourcesList.length} source/configuration files`,
   );
 
-// ── 7. AGENTS.md INTEGRITY ──────────────────────────────────────
+// ── 8. AGENTS.md INTEGRITY ──────────────────────────────────────
 
-console.log('\n7. AGENTS.md integrity');
+console.log('\n8. AGENTS.md integrity');
 
 const agents = readFile('AGENTS.md');
 const requiredSections = [
@@ -291,9 +364,9 @@ for (const section of requiredSections) {
   }
 }
 
-// ── 8. VERSION ──────────────────────────────────────────────────
+// ── 9. VERSION ──────────────────────────────────────────────────
 
-console.log('\n8. Version');
+console.log('\n9. Version');
 
 const pkg = JSON.parse(readFile('package.json'));
 if (/^\d+\.\d+\.\d+$/.test(pkg.version || '')) {

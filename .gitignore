@@ -65,3 +65,10 @@ bun.lock
 /.codex/
 /.aws/
 /.tmp-go-cache/
+
+# Generated browser dashboard artifacts
+/web/dist/
+/web/src/generated/api.d.ts
+
+# Local planning for the browser dashboard migration
+/documentation/dashboard-migration/

@@ -25,6 +25,7 @@ u.pathname = '/' + name;
 for (const file of [
   'src/helpers/test-legacy-import.mjs',
   'src/helpers/test-database.mjs',
+  'src/server/test-jobs-database.mjs',
   'src/eval/test-evaluation-cli.mjs',
   'src/cvgen/test-drafting-integration.mjs',
   'src/helpers/test-backup-restore.mjs',

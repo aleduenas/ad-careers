@@ -41,6 +41,24 @@ career-ops/
 └── documentation/                index, one page per source file, guides/
 ```
 
+## Browser migration source locations
+
+The reviewed browser migration adds these locations alongside the retained Go dashboard.
+The application remains local; PostgreSQL and the existing workflow launchers keep their roles.
+
+| Location | Responsibility |
+|---|---|
+| `src/server/` | Local Node ESM HTTP API, request schemas, read services and later task supervision; adjacent `test-*.mjs` tests |
+| `web/` | React/Vite/TypeScript application, configuration, shared styles and frontend checks |
+| `web/src/generated/` | Generated API types from server JSON Schemas; regenerated during checks, not a second maintained contract |
+| `web/dist/` | Generated frontend production build; not maintained source |
+| `documentation/src/server/`, `documentation/web/` | Mirrored reference pages for maintained server/frontend source and configuration |
+
+Keep one root npm manifest/lockfile for application dependencies and build scripts. Each new
+maintained source/configuration file receives its mirrored reference page. Generated types/build
+output are ignored and excluded from maintained-source documentation coverage. Root build/test
+integration preserves existing checks and the retained Go build until explicit retirement.
+
 ## Rules
 
 1. **Functions own their code and tests.** A script goes in the `src/<function>/` it serves; its tests sit beside it as `test-*.mjs`. `src/lib/` only holds modules imported by two or more functions. `src/helpers/` only holds commands a person runs by hand.

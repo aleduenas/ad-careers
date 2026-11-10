@@ -10,6 +10,15 @@
         "--isolated"
       ],
       "env": {}
+    },
+    "career_discord": {
+      "type": "stdio",
+      "command": "node",
+      "args": [
+        "src/helpers/discord-message.mjs",
+        "--mcp"
+      ],
+      "env": {}
     }
   }
 }

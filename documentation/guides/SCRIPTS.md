@@ -39,6 +39,18 @@ detail (inputs, outputs, callers) is in `documentation/src/`.
 | `node src/analytics/analyze-patterns.mjs` | Outcome patterns across statuses and reports |
 | `node src/analytics/followup-cadence.mjs [--applied-days N]` | Follow-up urgency for Applied/Interview jobs, dated from status events |
 
+## Browser dashboard foundation
+
+| Command | What it does |
+|---|---|
+| `npm run web:types` | Generate ignored `web/src/generated/api.d.ts` from the backend's public JSON Schemas. Requires `src/server/generate-types.mjs`; schemas remain the API authority. |
+| `npm run web:typecheck` | Regenerate API types, then run strict TypeScript checking for `web/`. It does not build the UI. |
+| `npm run web:build` | Run `web:typecheck` once, then build the frontend into ignored `web/dist/`. Requires `web/index.html` and frontend source. |
+| `npm run web:dev` | Start Vite on strict loopback `127.0.0.1:5173`; `/api` proxies to `127.0.0.1:4310` without forwarded-host headers. Fails if port 5173 is occupied. |
+| `npm run web:start [-- --no-open]` | Preflight and build the production web app, serve only `web/dist` on `127.0.0.1:4310` (or a validated `PORT`), and open `/#/overview`. `--no-open` leaves browser opening to the caller. Ctrl+C closes the owned listener; HTML uses a restrictive same-origin CSP, with API JSON protections unchanged. |
+
+The root Node toolchain requires Node.js 24 or newer. The harness quick run invokes `web:typecheck` once; the full run requires `web/index.html` and invokes `web:build` once, so typechecking is not repeated.
+
 ## Database
 
 | Command | What it does |
@@ -54,7 +66,7 @@ detail (inputs, outputs, callers) is in `documentation/src/`.
 
 | Command | What it does |
 |---|---|
-| `node src/test-all.mjs [--quick]` | Syntax, every `src/**/test-*.mjs`, dashboard build (skipped with `--quick`), data-contract and path checks. `npm test` |
+| `node src/test-all.mjs [--quick]` | Syntax/tests under `src/` and maintained web `.mjs`, web strict typecheck in quick mode, web production build in full mode when `web/index.html` exists, retained Go dashboard build in full mode, data-contract, docs and path checks. `npm test` |
 | `node src/<function>/test-*.mjs` | Any single test. Database-backed tests print `SKIPPED` without `TEST_DATABASE_URL`; use `db-test.mjs` to run them for real |
 | `go test ./...` (from `dashboard/`) | Dashboard unit tests; `TestPostgresDashboardLifecycle` needs `TEST_DATABASE_URL` |
 
@@ -72,3 +84,15 @@ detail (inputs, outputs, callers) is in `documentation/src/`.
 |---|---|
 | `go build -o dashboard.exe .` (from `dashboard/`) | Build the real binary; required after any dashboard change |
 | `dashboard/launch-dashboard.ps1` | Launch against the repository root (the shortcut target) |
+
+## Development lead and Discord
+
+| Command | What it does |
+|---|---|
+| `powershell -File src/helpers/Start-ClaudeLead.ps1 [-Check] [-Resume] [-NoDiscord]` | Start the Claude Code lead for the dashboard migration with the career-ops Discord bot attached. See [Start-ClaudeLead](../src/helpers/Start-ClaudeLead.md). |
+| `powershell -File src/helpers/Start-DiscordLead.ps1 -Configure` / `-ProjectChannel SERVER/CHANNEL -Apply` | Save the owner ID, encrypted bot token and project channel (configuration only; the Codex `-Terminal` launcher is retired). |
+| `node src/helpers/discord-message.mjs --dm 'message' [--send]` | Diagnostic owner DM; dry run unless `--send`. `--actions=N --blockers=N` refreshes the pinned board and topic. |
+
+The lead's normal Discord interface is the `career_discord` MCP server in `.mcp.json`: send_dm
+(owner DM), post_update (project-channel progress), set_attention (edits the pinned action/blocker
+board and the channel topic). See [helper reference](../src/helpers/discord-message.md).
