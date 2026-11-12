@@ -21,7 +21,7 @@
 - spawns `src/cvgen/generate-pdf.mjs <html> <pdf> --format=letter`
 
 ## Used by
-- `dashboard/main.go` (the viewer's publish-PDF action runs it with the absolute path of the open `cover-letter.md` and reports `cover-letter.pdf` next to it)
+- `src/server/letter.mjs` (the browser letter editor's publish action runs it and reports `cover-letter.pdf` next to the letter)
 
 ## Counterpart prompt(s)
 - none

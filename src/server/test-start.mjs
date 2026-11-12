@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { test } from 'node:test';
 import { createServer } from 'node:net';
-import { startService, parsePort } from './start.mjs';
+import { startService, parsePort, locateNpmCli } from './start.mjs';
 import { DatabaseUnavailableError } from './readiness.mjs';
 
 async function createOwnedTemp(prefix) {
@@ -119,6 +119,15 @@ test('validates ports and starts/stops an isolated server using injected readine
   const ready = await fetch(`http://127.0.0.1:${service.app.server.address().port}/api/v1/ready`);
   assert.equal(ready.status, 503);
   assert.equal((await ready.json()).error.code, 'DATABASE_UNAVAILABLE');
+  const session = await fetch(
+    `http://127.0.0.1:${service.app.server.address().port}/api/v1/session`,
+  );
+  assert.equal(session.status, 200);
+  assert.match(
+    (await session.json()).data.build,
+    /^\d{4}-\d\d-\d\dT[\d:.]+Z$/,
+    'build is the index.html mtime',
+  );
   await service.close();
   const noOpenService = await startService({
     port: await freePort(),
@@ -216,4 +225,93 @@ test('interrupted build stops only its injected owned process tree', async t => 
   });
   await assert.rejects(operation, /interrupted during the frontend build/);
   assert.equal(stopped, 1);
+});
+
+test('an injected letterService reaches the app', async t => {
+  const workspace = await createOwnedTemp('career startup letter ');
+  t.after(async () => cleanupOwnedTemp(workspace));
+  await mkdir(resolve(workspace, 'web', 'dist'), { recursive: true });
+  await writeFile(resolve(workspace, 'web', 'dist', 'index.html'), '<main>built</main>');
+  const letter = {
+    name: 'cover-letter.md',
+    text: 'Hello',
+    contentHash: 'a'.repeat(64),
+    pdf: null,
+    editable: true,
+  };
+  const service = await startService({
+    port: await freePort(),
+    rootDir: workspace,
+    build: false,
+    noOpen: true,
+    readiness: async () => {},
+    letterService: { read: async () => letter },
+  });
+  t.after(() => service.close());
+  const port = service.app.server.address().port;
+  const response = await fetch(`http://127.0.0.1:${port}/api/v1/jobs/7/letter`);
+  assert.equal(response.status, 200);
+  assert.equal((await response.json()).data.text, 'Hello');
+});
+
+test('locateNpmCli: npm_execpath first, then the repository, the node directory and PATH', async t => {
+  const base = await createOwnedTemp('career npm locate ');
+  t.after(async () => cleanupOwnedTemp(base));
+  const touch = async (...parts) => {
+    const path = resolve(base, ...parts);
+    await mkdir(resolve(path, '..'), { recursive: true });
+    await writeFile(path, '');
+    return path;
+  };
+  const cli = ['node_modules', 'npm', 'bin', 'npm-cli.js'];
+  const cwd = resolve(base, 'repo');
+  await mkdir(cwd, { recursive: true });
+  const nothing = { env: { PATH: '' }, execPath: resolve(base, 'nowhere', 'node.exe') };
+  await assert.rejects(locateNpmCli(cwd, nothing), /npm launcher is unavailable/);
+  // npm found through PATH: the launcher sits beside node_modules/npm (Windows layout).
+  await touch('tools', 'npm.cmd');
+  const viaPath = await touch('tools', ...cli);
+  const pathOnly = {
+    ...nothing,
+    platform: 'win32',
+    env: { PATH: `${resolve(base, 'empty')};${resolve(base, 'tools')}` },
+  };
+  assert.equal(await locateNpmCli(cwd, pathOnly), viaPath);
+  // Unix layout: <prefix>/bin/npm with <prefix>/lib/node_modules/npm.
+  await touch('prefix', 'bin', 'npm');
+  const viaPrefix = await touch('prefix', 'lib', ...cli);
+  assert.equal(
+    await locateNpmCli(cwd, {
+      ...nothing,
+      platform: 'linux',
+      env: { PATH: resolve(base, 'prefix', 'bin') },
+    }),
+    viaPrefix,
+  );
+  // Next to the node binary.
+  const beside = await touch('node-home', ...cli);
+  assert.equal(
+    await locateNpmCli(cwd, {
+      env: { PATH: '' },
+      execPath: resolve(base, 'node-home', 'node.exe'),
+    }),
+    beside,
+  );
+  // The repository copy beats the node directory; npm_execpath beats both.
+  const local = await touch('repo', ...cli);
+  assert.equal(
+    await locateNpmCli(cwd, {
+      env: { PATH: '' },
+      execPath: resolve(base, 'node-home', 'node.exe'),
+    }),
+    local,
+  );
+  const explicit = await touch('explicit', 'npm-cli.js');
+  assert.equal(
+    await locateNpmCli(cwd, {
+      env: { PATH: '', npm_execpath: explicit },
+      execPath: resolve(base, 'node-home', 'node.exe'),
+    }),
+    explicit,
+  );
 });

@@ -16,7 +16,7 @@ const slug = s =>
 try {
   const idArg = args.find(a => a.startsWith('--id='))?.slice(5);
   const selected = idArg
-    ? await query("SELECT * FROM jobs WHERE status='Pending' AND id=$1", [idArg])
+    ? await query("SELECT * FROM jobs WHERE status IN ('Pending','Evaluated') AND id=$1", [idArg])
     : terms
       ? await query(
           "SELECT * FROM jobs WHERE status='Pending' AND EXISTS(SELECT 1 FROM unnest($1::text[]) term WHERE strpos(lower(company||' '||role),term)>0) ORDER BY id",

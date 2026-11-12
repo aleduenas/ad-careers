@@ -1,12 +1,103 @@
 import type {
   ErrorResponse,
   HealthResponse,
+  IntakeAddResponse,
+  CostCallsResponse,
+  CostSummaryResponse,
+  IntakeCheckResponse,
+  IntakeFetchResponse,
+  IntakePreviewResponse,
+  IntakeSubmitRequest,
+  JobDetailResponse,
+  ProvidersPutRequest,
+  ProvidersSettingsResponse,
+  RunCreateRequest,
+  ScanReportResponse,
+  RunCreateResponse,
+  RunLogResponse,
+  RunResponse,
+  RunsResponse,
+  JobJdRequest,
+  JobJdWriteResponse,
+  JobMetadataRequest,
+  JobStatusRequest,
+  LetterPutRequest,
+  LetterResponse,
+  JobWriteResponse,
   JobsQuery,
   JobsResponse,
   OverviewResponse,
   ReadyResponse,
   SessionResponse,
 } from './generated/api';
+
+export type { JobDetailResponse };
+export type JobItem = JobsResponse['data']['items'][number];
+export type MaterialKey = 'cv' | 'letter' | 'brief' | 'prep';
+
+export type StatusRequest = JobStatusRequest;
+export type WritableStatus = JobStatusRequest['status'];
+export type MetadataRequest = JobMetadataRequest;
+export type JdRequest = JobJdRequest;
+export type SalaryValue = { min: string | null; max: string | null };
+export type DetailJob = JobDetailResponse['data']['job'];
+export type JobDetailJd = NonNullable<JobDetailResponse['data']['jd']>;
+export type { JobWriteResponse };
+export type JdWriteResponse = JobJdWriteResponse;
+export type IntakeCheck = IntakeCheckResponse['data'];
+export type CostRange = CostSummaryResponse['data']['range'];
+export type CostSummary = CostSummaryResponse['data'];
+export type CostTotals = CostSummary['totals'];
+export type CostJobRow = CostSummary['byJob'][number];
+export type CostCall = CostCallsResponse['data']['calls'][number];
+export type IntakeInput = IntakeSubmitRequest;
+export type IntakeFetched = IntakeFetchResponse['data'];
+export type IntakePreview = IntakePreviewResponse['data'];
+export type IntakeResult = IntakeAddResponse['data'];
+export type ScanRunRequest = Extract<RunCreateRequest, { action: 'scan' }>;
+export type ScanReport = ScanReportResponse['data'];
+export type ProviderSettings = ProvidersSettingsResponse['data'];
+export type ProviderKey = keyof ProviderSettings['readiness'];
+export type ProviderFunctionName = keyof ProviderSettings['functions'];
+export type ProviderFunctionSetting = ProviderSettings['functions'][ProviderFunctionName];
+export type ProviderReadiness = ProviderSettings['readiness'][ProviderKey];
+export type ReadinessState = ProviderReadiness['state'];
+export type ProviderSaveRequest = ProvidersPutRequest;
+export const providerFunctionNames: ProviderFunctionName[] = [
+  'evaluation',
+  'companyResearch',
+  'cv',
+  'coverLetter',
+];
+
+export type JobActions = JobDetailResponse['data']['actions'];
+// 3.5 added `publish` to the actions block; the 3.4 bar and dialog cover only these four.
+export type JobActionKey = Exclude<keyof JobActions, 'publish'>;
+export type LetterData = LetterResponse['data'];
+export type LetterSaveRequest = LetterPutRequest;
+export type PublishRunRequest = Extract<RunCreateRequest, { action: 'publish' }>;
+export const letterPdfHref = (id: string) => `/api/v1/jobs/${encodeURIComponent(id)}/letter/pdf`;
+export type JobRunRequest = Extract<
+  RunCreateRequest,
+  { action: 'evaluate' | 'cv' | 'letter' | 'both' }
+>;
+export type RunSelection = NonNullable<JobRunRequest['selection']>;
+
+export type RunRecord = RunResponse['data']['run'];
+export const discoveryCodes = ['DISCOVERY_BUSY', 'DUPLICATE_JOB', 'SEEN_URL'] as const;
+
+export const conflictCodes = [
+  'REVISION_CONFLICT',
+  'FIELD_CONFLICT',
+  'URL_IN_USE',
+  'JD_CONFLICT',
+] as const;
+export type ConflictCode = (typeof conflictCodes)[number];
+export function conflictCode(error: unknown): ConflictCode | null {
+  return error instanceof ApiFailure && (conflictCodes as readonly string[]).includes(error.code)
+    ? (error.code as ConflictCode)
+    : null;
+}
 
 export type EndpointState<T> =
   { kind: 'loading' } | { kind: 'success'; value: T } | { kind: 'error'; error: ApiFailure };
@@ -17,6 +108,7 @@ export class ApiFailure extends Error {
   readonly requestId?: string;
   readonly network: boolean;
   readonly fields?: Record<string, string>;
+  readonly current?: unknown;
 
   constructor(
     message: string,
@@ -25,6 +117,7 @@ export class ApiFailure extends Error {
     requestId?: string,
     network = false,
     fields?: Record<string, string>,
+    current?: unknown,
   ) {
     super(message);
     this.name = 'ApiFailure';
@@ -33,6 +126,7 @@ export class ApiFailure extends Error {
     this.requestId = requestId;
     this.network = network;
     this.fields = fields;
+    this.current = current;
   }
 }
 
@@ -61,6 +155,7 @@ const filters = [
   'rejected',
   'discarded',
   'offer',
+  'any',
 ];
 const sortKeys = ['score', 'statusDate', 'addedDate', 'company'];
 
@@ -85,7 +180,9 @@ function isHttpUrl(value: unknown): value is string | null {
   if (typeof value !== 'string') return false;
   try {
     const url = new URL(value);
-    return (url.protocol === 'https:' || url.protocol === 'http:') && !url.username && !url.password;
+    return (
+      (url.protocol === 'https:' || url.protocol === 'http:') && !url.username && !url.password
+    );
   } catch {
     return false;
   }
@@ -102,8 +199,52 @@ function isJobsQuery(value: unknown): value is JobsQuery {
     typeof value.grouped === 'boolean' &&
     Number.isInteger(value.limit) &&
     (value.limit as number) >= 1 &&
-    (value.limit as number) <= 200
+    (value.limit as number) <= 200 &&
+    (value.scoreMin === undefined || Number.isFinite(value.scoreMin)) &&
+    (value.scoreMax === undefined || Number.isFinite(value.scoreMax)) &&
+    (value.addedWeek === undefined || hasString(value.addedWeek))
   );
+}
+
+function isJobItem(item: unknown): boolean {
+  if (!isRecord(item) || !isRecord(item.materials) || !isRecord(item.compensation)) return false;
+  if (
+    typeof item.id !== 'string' ||
+    !/^[1-9]\d*$/.test(item.id) ||
+    typeof item.revision !== 'string' ||
+    !/^(0|[1-9]\d*)$/.test(item.revision) ||
+    !hasString(item.company) ||
+    !hasString(item.role) ||
+    !isHttpUrl(item.url) ||
+    !statuses.includes(item.status as string) ||
+    !(
+      item.score === null ||
+      (typeof item.score === 'number' &&
+        Number.isFinite(item.score) &&
+        item.score >= 0 &&
+        item.score <= 5)
+    ) ||
+    !isDate(item.addedDate) ||
+    !isDate(item.statusDate) ||
+    !hasNullableString(item.discardReason) ||
+    !(
+      item.salary === null ||
+      (isRecord(item.salary) &&
+        (item.salary.min === null ||
+          (typeof item.salary.min === 'string' && /^\d+(\.\d+)?$/.test(item.salary.min))) &&
+        (item.salary.max === null ||
+          (typeof item.salary.max === 'string' && /^\d+(\.\d+)?$/.test(item.salary.max))) &&
+        item.salary.source === 'manual')
+    ) ||
+    !hasNullableString(item.compensation.text) ||
+    !['notEvaluated', 'manual', 'report', 'missing', 'invalid'].includes(
+      item.compensation.state as string,
+    ) ||
+    typeof item.materials.cv !== 'boolean' ||
+    typeof item.materials.letter !== 'boolean'
+  )
+    return false;
+  return true;
 }
 
 function isJobsResponse(value: unknown): value is JobsResponse {
@@ -118,44 +259,413 @@ function isJobsResponse(value: unknown): value is JobsResponse {
     items.length > 200
   )
     return false;
-  return items.every(item => {
-    if (!isRecord(item) || !isRecord(item.materials) || !isRecord(item.compensation)) return false;
-    if (
-      typeof item.id !== 'string' ||
-      !/^[1-9]\d*$/.test(item.id) ||
-      typeof item.revision !== 'string' ||
-      !/^(0|[1-9]\d*)$/.test(item.revision) ||
-      !hasString(item.company) ||
-      !hasString(item.role) ||
-      !isHttpUrl(item.url) ||
-      !statuses.includes(item.status as string) ||
-      !(
-        item.score === null ||
-        (typeof item.score === 'number' &&
-          Number.isFinite(item.score) &&
-          item.score >= 0 &&
-          item.score <= 5)
-      ) ||
-      !isDate(item.addedDate) ||
-      !isDate(item.statusDate) ||
-      !hasNullableString(item.discardReason) ||
-      !(
-        item.salary === null ||
-        (isRecord(item.salary) &&
-          (item.salary.min === null || (typeof item.salary.min === 'string' && /^\d+(\.\d+)?$/.test(item.salary.min))) &&
-          (item.salary.max === null || (typeof item.salary.max === 'string' && /^\d+(\.\d+)?$/.test(item.salary.max))) &&
-          item.salary.source === 'manual')
-      ) ||
-      !hasNullableString(item.compensation.text) ||
-      !['notEvaluated', 'manual', 'report', 'missing', 'invalid'].includes(
-        item.compensation.state as string,
-      ) ||
-      typeof item.materials.cv !== 'boolean' ||
-      typeof item.materials.letter !== 'boolean'
+  return items.every(isJobItem);
+}
+
+function isNullableText(value: unknown): value is string | null {
+  return value === null || typeof value === 'string';
+}
+
+function isDetailJob(job: unknown): boolean {
+  if (!isRecord(job) || typeof job.notes !== 'string' || typeof job.evaluationError !== 'boolean')
+    return false;
+  const { notes: _notes, evaluationError: _error, ...item } = job;
+  void _notes;
+  void _error;
+  return isJobItem(item);
+}
+
+function isJdRecord(jd: unknown): boolean {
+  return (
+    isRecord(jd) &&
+    typeof jd.text === 'string' &&
+    typeof jd.contentHash === 'string' &&
+    typeof jd.revision === 'string' &&
+    isNullableText(jd.syncedAt)
+  );
+}
+
+function isJobWriteResponse(value: unknown): value is JobWriteResponse {
+  return isRecord(value) && isRecord(value.data) && isDetailJob(value.data.job);
+}
+
+function isJdWriteResponse(value: unknown): value is JdWriteResponse {
+  return (
+    isRecord(value) &&
+    isRecord(value.data) &&
+    isDetailJob(value.data.job) &&
+    isJdRecord(value.data.jd) &&
+    (value.data.cacheSync === 'ok' || value.data.cacheSync === 'error')
+  );
+}
+
+function isActionState(value: unknown): boolean {
+  return isRecord(value) && typeof value.enabled === 'boolean' && strOrNull(value.reason);
+}
+
+function isJobActions(value: unknown): boolean {
+  return (
+    isRecord(value) && ['evaluate', 'cv', 'letter', 'both'].every(key => isActionState(value[key]))
+  );
+}
+
+function isJobDetailResponse(value: unknown): value is JobDetailResponse {
+  if (!isRecord(value) || !isRecord(value.data)) return false;
+  if (!isJobActions(value.data.actions)) return false;
+  const { job, jd, evaluation, history, materials, interviewPrep } = value.data;
+  if (!isRecord(job) || typeof job.notes !== 'string' || typeof job.evaluationError !== 'boolean')
+    return false;
+  if (!isDetailJob(job)) return false;
+  if (
+    jd !== null &&
+    !(
+      isRecord(jd) &&
+      typeof jd.text === 'string' &&
+      typeof jd.revision === 'string' &&
+      isNullableText(jd.syncedAt)
     )
-      return false;
-    return true;
-  });
+  )
+    return false;
+  if (!isRecord(evaluation) || !isRecord(evaluation.report) || !Array.isArray(evaluation.history))
+    return false;
+  if (
+    !isNullableText(evaluation.report.text) ||
+    !['ok', 'missing', 'invalid', 'unsafe'].includes(evaluation.report.state as string)
+  )
+    return false;
+  if (
+    !evaluation.history.every(
+      row =>
+        isRecord(row) &&
+        typeof row.id === 'string' &&
+        (row.score === null || typeof row.score === 'number') &&
+        isNullableText(row.resultStatus) &&
+        isNullableText(row.createdAt),
+    )
+  )
+    return false;
+  if (
+    !Array.isArray(history) ||
+    !history.every(
+      row =>
+        isRecord(row) &&
+        typeof row.id === 'string' &&
+        isNullableText(row.oldStatus) &&
+        typeof row.newStatus === 'string' &&
+        isNullableText(row.reason) &&
+        isNullableText(row.actor) &&
+        isNullableText(row.occurredAt) &&
+        isNullableText(row.createdAt),
+    )
+  )
+    return false;
+  if (
+    !isRecord(materials) ||
+    !['id', 'legacy', 'none'].includes(materials.match as string) ||
+    typeof materials.ambiguous !== 'boolean' ||
+    !Array.isArray(materials.items) ||
+    !materials.items.every(
+      row =>
+        isRecord(row) &&
+        ['cv', 'letter', 'brief'].includes(row.key as string) &&
+        typeof row.name === 'string' &&
+        ['pdf', 'html', 'md'].includes(row.kind as string) &&
+        hasCount(row.size) &&
+        isNullableText(row.modifiedAt),
+    )
+  )
+    return false;
+  return (
+    interviewPrep === null ||
+    (isRecord(interviewPrep) &&
+      typeof interviewPrep.name === 'string' &&
+      hasCount(interviewPrep.size))
+  );
+}
+
+const strOrNull = (value: unknown) => value === null || typeof value === 'string';
+
+function isIntakeCheck(value: unknown): value is { data: IntakeCheck } {
+  if (!isRecord(value) || !isRecord(value.data)) return false;
+  const { url, tracked, seen } = value.data;
+  return (
+    strOrNull(url) &&
+    (tracked === null ||
+      (isRecord(tracked) &&
+        typeof tracked.id === 'string' &&
+        typeof tracked.company === 'string' &&
+        typeof tracked.role === 'string' &&
+        typeof tracked.status === 'string')) &&
+    (seen === null ||
+      (isRecord(seen) &&
+        typeof seen.company === 'string' &&
+        typeof seen.title === 'string' &&
+        typeof seen.status === 'string' &&
+        strOrNull(seen.firstSeen)))
+  );
+}
+
+function isCompanies(value: unknown): value is { data: { companies: string[] } } {
+  return (
+    isRecord(value) &&
+    isRecord(value.data) &&
+    Array.isArray(value.data.companies) &&
+    value.data.companies.every(item => typeof item === 'string')
+  );
+}
+
+function isIntakeFetched(value: unknown): value is { data: IntakeFetched } {
+  if (!isRecord(value) || !isRecord(value.data)) return false;
+  const d = value.data;
+  return (
+    typeof d.url === 'string' &&
+    strOrNull(d.company) &&
+    strOrNull(d.role) &&
+    strOrNull(d.location) &&
+    strOrNull(d.text) &&
+    (d.source === 'resolver' || d.source === 'firecrawl') &&
+    typeof d.method === 'string' &&
+    Array.isArray(d.warnings) &&
+    d.warnings.every(item => typeof item === 'string')
+  );
+}
+
+const costNumbers = [
+  'calls',
+  'inputTokens',
+  'cachedInputTokens',
+  'cacheWriteTokens',
+  'outputTokens',
+  'reasoningTokens',
+  'totalTokens',
+] as const;
+
+function isCostRow(value: unknown): boolean {
+  return (
+    isRecord(value) &&
+    costNumbers.every(key => hasCount(value[key])) &&
+    (value.estimatedUsd === null ||
+      (typeof value.estimatedUsd === 'number' && Number.isFinite(value.estimatedUsd)))
+  );
+}
+
+function isCostSummary(value: unknown): value is CostSummaryResponse {
+  if (!isRecord(value) || !isRecord(value.data)) return false;
+  const d = value.data;
+  const rows = (key: string, extra: (row: Record<string, unknown>) => boolean) =>
+    Array.isArray(d[key]) &&
+    (d[key] as unknown[]).every(row => isCostRow(row) && extra(row as Record<string, unknown>));
+  return (
+    ['7d', '30d', '90d', 'all'].includes(d.range as string) &&
+    isCostRow(d.totals) &&
+    rows('byModel', r => typeof r.provider === 'string' && typeof r.model === 'string') &&
+    rows('byFunction', r => typeof r.function === 'string') &&
+    rows('byJob', r => strOrNull(r.jobId) && strOrNull(r.company) && strOrNull(r.role)) &&
+    rows('byDay', r => typeof r.day === 'string') &&
+    Array.isArray(d.unpriced) &&
+    d.unpriced.every(item => typeof item === 'string')
+  );
+}
+
+function isCostCalls(value: unknown): value is CostCallsResponse {
+  if (!isRecord(value) || !isRecord(value.data)) return false;
+  const d = value.data;
+  return (
+    hasCount(d.total) &&
+    Array.isArray(d.calls) &&
+    d.calls.every(
+      call =>
+        isRecord(call) &&
+        typeof call.id === 'string' &&
+        typeof call.occurredAt === 'string' &&
+        typeof call.provider === 'string' &&
+        typeof call.model === 'string' &&
+        typeof call.function === 'string' &&
+        strOrNull(call.jobId) &&
+        costNumbers.slice(1).every(key => hasCount(call[key])) &&
+        (call.estimatedUsd === null || typeof call.estimatedUsd === 'number'),
+    )
+  );
+}
+
+function isIntakePreview(value: unknown): value is { data: IntakePreview } {
+  return (
+    isRecord(value) &&
+    isRecord(value.data) &&
+    typeof value.data.company === 'string' &&
+    typeof value.data.role === 'string' &&
+    typeof value.data.url === 'string' &&
+    typeof value.data.jdPath === 'string'
+  );
+}
+
+function isIntakeResult(value: unknown): value is { data: IntakeResult } {
+  return (
+    isRecord(value) &&
+    isRecord(value.data) &&
+    typeof value.data.id === 'string' &&
+    /^[1-9]\d*$/.test(value.data.id) &&
+    typeof value.data.company === 'string' &&
+    typeof value.data.role === 'string' &&
+    typeof value.data.jdPath === 'string'
+  );
+}
+
+const summaryKeys = [
+  'structured',
+  'richOnly',
+  'unclassified',
+  'ok',
+  'empty',
+  'error',
+  'jobsFound',
+  'newOffers',
+  'missingFullJd',
+];
+
+function isScanReport(value: unknown): value is { data: ScanReport } {
+  if (!isRecord(value) || !isRecord(value.data)) return false;
+  const { dryRun, generatedAt, summary, companies, missing } = value.data;
+  return (
+    typeof dryRun === 'boolean' &&
+    typeof generatedAt === 'string' &&
+    isRecord(summary) &&
+    summaryKeys.every(key => hasCount(summary[key])) &&
+    Array.isArray(companies) &&
+    companies.every(
+      item =>
+        isRecord(item) &&
+        typeof item.company === 'string' &&
+        typeof item.classification === 'string' &&
+        strOrNull(item.provider) &&
+        typeof item.status === 'string' &&
+        hasCount(item.jobsFound) &&
+        strOrNull(item.reason),
+    ) &&
+    Array.isArray(missing) &&
+    missing.every(
+      item =>
+        isRecord(item) &&
+        typeof item.company === 'string' &&
+        typeof item.title === 'string' &&
+        typeof item.url === 'string',
+    )
+  );
+}
+
+function isProviderKey(value: unknown): value is ProviderKey {
+  return value === 'claude' || value === 'codex';
+}
+
+function isReadinessMap(value: unknown): value is Record<ProviderKey, ProviderReadiness> {
+  return (
+    isRecord(value) &&
+    (['claude', 'codex'] as const).every(key => {
+      const item = value[key];
+      return (
+        isRecord(item) &&
+        ['unknown', 'ready', 'notLoggedIn', 'unavailable'].includes(item.state as string) &&
+        strOrNull(item.checkedAt ?? null) &&
+        strOrNull(item.message ?? null)
+      );
+    })
+  );
+}
+
+function isFunctionMap(value: unknown): value is ProviderSettings['functions'] {
+  return (
+    isRecord(value) &&
+    providerFunctionNames.every(name => {
+      const item = value[name];
+      return (
+        isRecord(item) &&
+        isProviderKey(item.provider) &&
+        typeof item.model === 'string' &&
+        (item.source === 'file' || item.source === 'legacy')
+      );
+    })
+  );
+}
+
+function isModelList(value: unknown): value is string[] {
+  return (
+    Array.isArray(value) &&
+    value.length >= 1 &&
+    value.length <= 50 &&
+    value.every(item => typeof item === 'string' && item.length > 0)
+  );
+}
+
+function isProviderSettings(value: unknown): value is { data: ProviderSettings } {
+  return (
+    isRecord(value) &&
+    isRecord(value.data) &&
+    isFunctionMap(value.data.functions) &&
+    typeof value.data.revision === 'string' &&
+    isReadinessMap(value.data.readiness) &&
+    isRecord(value.data.models) &&
+    isModelList(value.data.models.claude) &&
+    isModelList(value.data.models.codex)
+  );
+}
+
+function isLetterResponse(value: unknown): value is LetterResponse {
+  if (!isRecord(value) || !isRecord(value.data)) return false;
+  const data = value.data;
+  return (
+    data.name === 'cover-letter.md' &&
+    typeof data.text === 'string' &&
+    typeof data.contentHash === 'string' &&
+    typeof data.editable === 'boolean' &&
+    (data.pdf === null ||
+      (isRecord(data.pdf) &&
+        data.pdf.name === 'cover-letter.pdf' &&
+        typeof data.pdf.modifiedAt === 'string'))
+  );
+}
+
+function isRunRecord(run: unknown): boolean {
+  return (
+    isRecord(run) &&
+    typeof run.id === 'string' &&
+    typeof run.action === 'string' &&
+    ['queued', 'running', 'completed', 'failed', 'interrupted'].includes(run.state as string) &&
+    typeof run.phase === 'string' &&
+    typeof run.createdAt === 'string'
+  );
+}
+
+function isRunResponse(value: unknown): value is RunResponse {
+  return isRecord(value) && isRecord(value.data) && isRunRecord(value.data.run);
+}
+
+function isRunsResponse(value: unknown): value is RunsResponse {
+  return (
+    isRecord(value) &&
+    isRecord(value.data) &&
+    Array.isArray(value.data.runs) &&
+    value.data.runs.every(isRunRecord)
+  );
+}
+
+function isRunCreateResponse(value: unknown): value is RunCreateResponse {
+  return (
+    isRecord(value) &&
+    isRecord(value.data) &&
+    Array.isArray(value.data.runs) &&
+    value.data.runs.length >= 1 &&
+    value.data.runs.every(isRunRecord)
+  );
+}
+
+function isRunLogResponse(value: unknown): value is RunLogResponse {
+  return (
+    isRecord(value) &&
+    isRecord(value.data) &&
+    typeof value.data.text === 'string' &&
+    hasCount(value.data.nextOffset) &&
+    typeof value.data.truncated === 'boolean'
+  );
 }
 
 function isOverviewResponse(value: unknown): value is OverviewResponse {
@@ -215,22 +725,81 @@ function isOverviewResponse(value: unknown): value is OverviewResponse {
   );
 }
 
+/** Time this page was built; 'dev' under the Vite dev server and in tests. */
+export const PAGE_BUILD: string = typeof __BUILD_STAMP__ === 'string' ? __BUILD_STAMP__ : 'dev';
+export const RELOAD_MESSAGE = 'The dashboard was updated. Reload this page.';
+export const RESTART_PENDING_MESSAGE = 'A newer build is waiting for the service to restart.';
+
+let serverBuild: string | null = null;
+
+// The page stamp is taken before the build finishes and the service stamp is the finished file's
+// time, so a current pair differs by seconds. Only a larger gap means a different build.
+const BUILD_TOLERANCE_MS = 30_000;
+
+/**
+ * How this page compares with the running service: 'pageOlder' is an old tab (reloading fixes it),
+ * 'serviceOlder' is a service that has not been restarted onto the newer build. 'dev' on either
+ * side is never a mismatch.
+ */
+export function buildRelation(
+  server: string | null | undefined = serverBuild,
+  page: string = PAGE_BUILD,
+): 'same' | 'pageOlder' | 'serviceOlder' {
+  if (!server || server === 'dev' || page === 'dev') return 'same';
+  const a = Date.parse(server);
+  const b = Date.parse(page);
+  if (!Number.isFinite(a) || !Number.isFinite(b)) return 'same';
+  if (a - b > BUILD_TOLERANCE_MS) return 'pageOlder';
+  if (b - a > 0) return 'serviceOlder';
+  return 'same';
+}
+
+export function buildMessage(relation: ReturnType<typeof buildRelation>): string | null {
+  return relation === 'pageOlder'
+    ? RELOAD_MESSAGE
+    : relation === 'serviceOlder'
+      ? RESTART_PENDING_MESSAGE
+      : null;
+}
+
 function invalidResponse(): ApiFailure {
+  // A page and service from different builds are the usual cause of an unexpected response.
   return new ApiFailure(
-    'The local service returned an unexpected response.',
+    buildMessage(buildRelation()) ?? 'The local service returned an unexpected response.',
     'INVALID_RESPONSE',
     false,
   );
 }
 
-async function read<T>(path: string, fetcher: typeof fetch, signal: AbortSignal): Promise<T> {
+interface WriteInit {
+  method: 'POST' | 'PUT' | 'PATCH';
+  body: unknown;
+  nonce: string;
+}
+
+async function read<T>(
+  path: string,
+  fetcher: typeof fetch,
+  signal: AbortSignal,
+  write?: WriteInit,
+): Promise<T> {
   let response: Response;
   try {
-    response = await fetcher(path, {
-      method: 'GET',
-      headers: { Accept: 'application/json' },
-      signal,
-    });
+    response = await fetcher(
+      path,
+      write
+        ? {
+            method: write.method,
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+              'x-career-ops-session': write.nonce,
+            },
+            body: JSON.stringify(write.body),
+            signal,
+          }
+        : { method: 'GET', headers: { Accept: 'application/json' }, signal },
+    );
   } catch (error) {
     if (signal.aborted) throw error;
     throw new ApiFailure(
@@ -279,17 +848,37 @@ async function read<T>(path: string, fetcher: typeof fetch, signal: AbortSignal)
             ),
           )
         : undefined,
+      detail.current,
     );
   }
   if (!isRecord(body) || !isRecord(body.data) || !isRecord(body.meta)) throw invalidResponse();
   return body as T;
 }
 
+function checkedId(id: string): string {
+  if (!/^[1-9][0-9]{0,18}$/.test(id))
+    throw new ApiFailure(
+      'This job address is not valid.',
+      'INVALID_REQUEST',
+      false,
+      undefined,
+      false,
+      {
+        id: 'Invalid value.',
+      },
+    );
+  return id;
+}
+
 export function createApi(fetcher: typeof fetch = fetch) {
   return {
     health: (signal: AbortSignal) => read<HealthResponse>('/api/v1/health', fetcher, signal),
     ready: (signal: AbortSignal) => read<ReadyResponse>('/api/v1/ready', fetcher, signal),
-    session: (signal: AbortSignal) => read<SessionResponse>('/api/v1/session', fetcher, signal),
+    session: async (signal: AbortSignal) => {
+      const result = await read<SessionResponse>('/api/v1/session', fetcher, signal);
+      serverBuild = typeof result.data.build === 'string' ? result.data.build : null;
+      return result;
+    },
     jobs: async (query: JobsQuery, cursor: string | null, signal: AbortSignal) => {
       const params = new URLSearchParams({
         q: query.q,
@@ -299,10 +888,233 @@ export function createApi(fetcher: typeof fetch = fetch) {
         grouped: String(query.grouped),
         limit: String(query.limit),
       });
+      if (query.scoreMin !== undefined) params.set('scoreMin', String(query.scoreMin));
+      if (query.scoreMax !== undefined) params.set('scoreMax', String(query.scoreMax));
+      if (query.addedWeek) params.set('addedWeek', query.addedWeek);
       if (cursor) params.set('cursor', cursor);
       const result = await read<unknown>(`/api/v1/jobs?${params}`, fetcher, signal);
       if (!isJobsResponse(result)) throw invalidResponse();
       return result;
+    },
+    jobDetail: async (id: string, signal: AbortSignal) => {
+      if (!/^[1-9][0-9]{0,18}$/.test(id))
+        throw new ApiFailure(
+          'This job address is not valid.',
+          'INVALID_REQUEST',
+          false,
+          undefined,
+          false,
+          {
+            id: 'Invalid value.',
+          },
+        );
+      const result = await read<unknown>(`/api/v1/jobs/${id}`, fetcher, signal);
+      if (!isJobDetailResponse(result)) throw invalidResponse();
+      return result;
+    },
+    changeStatus: async (id: string, body: StatusRequest, nonce: string, signal: AbortSignal) => {
+      const result = await read<unknown>(`/api/v1/jobs/${checkedId(id)}/status`, fetcher, signal, {
+        method: 'POST',
+        body,
+        nonce,
+      });
+      if (!isJobWriteResponse(result)) throw invalidResponse();
+      return result;
+    },
+    changeMetadata: async (
+      id: string,
+      body: MetadataRequest,
+      nonce: string,
+      signal: AbortSignal,
+    ) => {
+      const result = await read<unknown>(
+        `/api/v1/jobs/${checkedId(id)}/metadata`,
+        fetcher,
+        signal,
+        { method: 'PATCH', body, nonce },
+      );
+      if (!isJobWriteResponse(result)) throw invalidResponse();
+      return result;
+    },
+    saveJd: async (id: string, body: JdRequest, nonce: string, signal: AbortSignal) => {
+      const result = await read<unknown>(`/api/v1/jobs/${checkedId(id)}/jd`, fetcher, signal, {
+        method: 'PUT',
+        body,
+        nonce,
+      });
+      if (!isJdWriteResponse(result)) throw invalidResponse();
+      return result;
+    },
+    intakeCheck: async (url: string, nonce: string, signal: AbortSignal) => {
+      const result = await read<unknown>('/api/v1/intake/check', fetcher, signal, {
+        method: 'POST',
+        body: { url },
+        nonce,
+      });
+      if (!isIntakeCheck(result)) throw invalidResponse();
+      return result;
+    },
+    intakeFetch: async (url: string, nonce: string, signal: AbortSignal) => {
+      const result = await read<unknown>('/api/v1/intake/fetch', fetcher, signal, {
+        method: 'POST',
+        body: { url },
+        nonce,
+      });
+      if (!isIntakeFetched(result)) throw invalidResponse();
+      return result;
+    },
+    costSummary: async (range: CostRange, signal: AbortSignal) => {
+      const result = await read<unknown>(
+        `/api/v1/cost/summary?range=${encodeURIComponent(range)}`,
+        fetcher,
+        signal,
+      );
+      if (!isCostSummary(result)) throw invalidResponse();
+      return result;
+    },
+    costCalls: async (range: CostRange, limit: number, signal: AbortSignal) => {
+      const result = await read<unknown>(
+        `/api/v1/cost/calls?range=${encodeURIComponent(range)}&limit=${limit}`,
+        fetcher,
+        signal,
+      );
+      if (!isCostCalls(result)) throw invalidResponse();
+      return result;
+    },
+    intakeCompanies: async (q: string, signal: AbortSignal) => {
+      const result = await read<unknown>(
+        `/api/v1/intake/companies?q=${encodeURIComponent(q)}`,
+        fetcher,
+        signal,
+      );
+      if (!isCompanies(result)) throw invalidResponse();
+      return result;
+    },
+    intakePreview: async (body: IntakeInput, nonce: string, signal: AbortSignal) => {
+      const result = await read<unknown>('/api/v1/intake/preview', fetcher, signal, {
+        method: 'POST',
+        body,
+        nonce,
+      });
+      if (!isIntakePreview(result)) throw invalidResponse();
+      return result;
+    },
+    intake: async (body: IntakeInput, nonce: string, signal: AbortSignal) => {
+      const result = await read<unknown>('/api/v1/intake', fetcher, signal, {
+        method: 'POST',
+        body,
+        nonce,
+      });
+      if (!isIntakeResult(result)) throw invalidResponse();
+      return result;
+    },
+    startScan: async (body: ScanRunRequest, nonce: string, signal: AbortSignal) => {
+      const result = await read<unknown>('/api/v1/runs', fetcher, signal, {
+        method: 'POST',
+        body,
+        nonce,
+      });
+      if (!isRunCreateResponse(result)) throw invalidResponse();
+      return result;
+    },
+    letter: async (id: string, signal: AbortSignal) => {
+      const result = await read<unknown>(`/api/v1/jobs/${checkedId(id)}/letter`, fetcher, signal);
+      if (!isLetterResponse(result)) throw invalidResponse();
+      return result;
+    },
+    saveLetter: async (id: string, body: LetterSaveRequest, nonce: string, signal: AbortSignal) => {
+      const result = await read<unknown>(`/api/v1/jobs/${checkedId(id)}/letter`, fetcher, signal, {
+        method: 'PUT',
+        body,
+        nonce,
+      });
+      if (!isLetterResponse(result)) throw invalidResponse();
+      return result;
+    },
+    startPublish: async (body: PublishRunRequest, nonce: string, signal: AbortSignal) => {
+      const result = await read<unknown>('/api/v1/runs', fetcher, signal, {
+        method: 'POST',
+        body,
+        nonce,
+      });
+      if (!isRunCreateResponse(result)) throw invalidResponse();
+      return result;
+    },
+    startJobRun: async (body: JobRunRequest, nonce: string, signal: AbortSignal) => {
+      const result = await read<unknown>('/api/v1/runs', fetcher, signal, {
+        method: 'POST',
+        body,
+        nonce,
+      });
+      if (!isRunCreateResponse(result)) throw invalidResponse();
+      return result;
+    },
+    // `limit` raises how many terminal rows come back (server default 12, at most 50). It is sent
+    // only when it differs from the default.
+    runs: async (signal: AbortSignal, jobId?: string, limit?: number) => {
+      const query = new URLSearchParams();
+      if (jobId) query.set('jobId', jobId);
+      if (limit !== undefined && limit !== 12) query.set('limit', String(limit));
+      const result = await read<unknown>(
+        query.size ? `/api/v1/runs?${query.toString()}` : '/api/v1/runs',
+        fetcher,
+        signal,
+      );
+      if (!isRunsResponse(result)) throw invalidResponse();
+      return result;
+    },
+    run: async (id: string, signal: AbortSignal) => {
+      const result = await read<unknown>(`/api/v1/runs/${encodeURIComponent(id)}`, fetcher, signal);
+      if (!isRunResponse(result)) throw invalidResponse();
+      return result;
+    },
+    runLog: async (id: string, offset: number, signal: AbortSignal) => {
+      const result = await read<unknown>(
+        `/api/v1/runs/${encodeURIComponent(id)}/log?offset=${offset}`,
+        fetcher,
+        signal,
+      );
+      if (!isRunLogResponse(result)) throw invalidResponse();
+      return result;
+    },
+    scanReport: async (id: string, signal: AbortSignal) => {
+      const result = await read<unknown>(
+        `/api/v1/runs/${encodeURIComponent(id)}/scan-report`,
+        fetcher,
+        signal,
+      );
+      if (!isScanReport(result)) throw invalidResponse();
+      return result;
+    },
+    providerSettings: async (signal: AbortSignal) => {
+      const result = await read<unknown>('/api/v1/settings/providers', fetcher, signal);
+      if (!isProviderSettings(result)) throw invalidResponse();
+      return result;
+    },
+    saveProvider: async (
+      name: ProviderFunctionName,
+      body: ProviderSaveRequest,
+      nonce: string,
+      signal: AbortSignal,
+    ) => {
+      const result = await read<unknown>(`/api/v1/settings/providers/${name}`, fetcher, signal, {
+        method: 'PUT',
+        body,
+        nonce,
+      });
+      if (!isProviderSettings(result)) throw invalidResponse();
+      return result;
+    },
+    checkProviderReadiness: async (nonce: string, signal: AbortSignal) => {
+      const result = await read<unknown>('/api/v1/settings/providers/readiness', fetcher, signal, {
+        method: 'POST',
+        body: {},
+        nonce,
+      });
+      const data = isRecord(result) && isRecord(result.data) ? result.data : null;
+      const readiness = data && (isReadinessMap(data.readiness) ? data.readiness : data);
+      if (!isReadinessMap(readiness)) throw invalidResponse();
+      return readiness;
     },
     overview: async (signal: AbortSignal) => {
       const result = await read<unknown>('/api/v1/overview', fetcher, signal);

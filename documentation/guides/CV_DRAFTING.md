@@ -102,6 +102,7 @@ disabled (`src/lib/cli-runtime.mjs`).
 
 ```bash
 node src/cvgen/draft-cv.mjs --doctor                 # subscription login check for both providers
+node src/cvgen/draft-cv.mjs --job=ID --model=ID       # one-run model override (also draft-cover-letter.mjs); defaults unchanged
 node src/cvgen/draft-cv.mjs --job=123 --dry-run      # resolve inputs, write nothing
 node src/cvgen/draft-cv.mjs --job=123 --prepare-only # write the run folder, no model call
 ```

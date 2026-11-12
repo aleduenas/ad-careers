@@ -1,6 +1,6 @@
 # Architecture
 
-The Go dashboard and Node workflow scripts connect to the same local PostgreSQL server. Docker Compose defines its network binding, health check and durable volume. See [database operations](database.md).
+The browser dashboard server and the Node workflow scripts connect to the same local PostgreSQL server. Docker Compose defines its network binding, health check and durable volume. See [database operations](database.md).
 
 ```text
 Public discovery / pasted JD → cached JD → PostgreSQL jobs

@@ -6,12 +6,13 @@ import {
   writeFileSync,
   renameSync,
 } from 'node:fs';
-import { join, dirname, resolve } from 'node:path';
+import { join, dirname, resolve, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { cliSpec, processRun, temporaryWorker } from '../lib/cli-runtime.mjs';
 import { RESEARCH_SECTIONS, companyFreshness } from './_evaluation-plan.mjs';
 import { logTokenUsage } from '../lib/_token-debug.mjs';
+import { logRefOf } from '../lib/_llm-usage.mjs';
 import { findCachedJD } from '../lib/_cached-jd.mjs';
 import { renderPrompt, extractWorksheetJSON, sameShape } from '../lib/_prompt-templates.mjs';
 import { root as promptRoot } from '../lib/root.mjs';
@@ -197,6 +198,12 @@ export function companyPrompt(company, urls, cache, date) {
     DATE: date,
   });
 }
+// Phase names in this launcher map onto the accounting function labels of llm_calls.
+export function usageFunction(phase) {
+  if (phase === 'research') return 'companyResearch';
+  if (['gate', 'market', 'evaluation'].includes(phase)) return phase;
+  return 'smoke';
+}
 export async function invoke(
   root,
   dir,
@@ -233,6 +240,13 @@ export async function invoke(
         cwd,
         input: prompt + correction,
         timeout: config.timeout_ms,
+        usage: {
+          provider,
+          model: config[provider + '_model'],
+          fn: usageFunction(phase),
+          jobId: /^[0-9]+$/.test(basename(dir)) ? basename(dir) : null,
+          logRef: logRefOf(root, prefix + '.stdout.log'),
+        },
       });
       logTokenUsage(root, {
         provider,

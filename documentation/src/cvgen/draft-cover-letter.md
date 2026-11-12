@@ -4,9 +4,9 @@
 **Purpose:** Drafts a standalone cover letter for one job with an isolated subscription CLI call, retried up to `max_repairs` times on a CLI or empty-response failure. It fills the cover-letter worksheet prompt with the cached JD, the compact CV, the paragraph samples and the writing style guide, wraps the worker's plain-text answer in the salutation and sign-off, and writes `output/<company>/<role>--<job-id>/cover-letter.md` for review. It is the only way a letter is drafted: the CV worker (`draft-cv.mjs`) never writes one, because a single call drafting both overfit the letter to the CV and invented facts.
 
 ## Run
-`node src/cvgen/draft-cover-letter.mjs --job=ID [--provider=claude|codex] [--dry-run] [--prepare-only]`
+`node src/cvgen/draft-cover-letter.mjs --job=ID [--provider=claude|codex] [--model=ID] [--dry-run] [--prepare-only]`
 - `--job=ID`: permanent job ID (report, JD and output folder resolved from PostgreSQL). Alternative: `--jd=path --report=path --out=output/company/role`, with `--without-report` to skip the report requirement (needs prior user authorization).
-- `--provider`: `claude` or `codex` (default from `config/cv-drafting.json`).
+- `--provider`: `claude` or `codex` (default from `config/cv-drafting.json`). `--model=ID`: model for this run only (at most 80 characters, no control characters); absent keeps `<provider>_model` from the config. The browser dashboard passes its saved selection through these flags.
 - `--dry-run`: print provider, run directory, prompt path and selection; writes nothing.
 - `--prepare-only`: write the run folder with the rendered context; no login check, no CLI call.
 - Run directly; `draft-cv.mjs` no longer forwards to it and rejects `--letter-only`.
@@ -31,7 +31,7 @@
 - `src/lib/_task-status.mjs` (`reportPhase`)
 
 ## Used by
-- `dashboard/workflow.go` (action `letter`, and the `letter` half of `both`; always `--job=N`), `dashboard/workflow_test.go`
+- `src/server/runs.mjs` (browser action `letter`; always `--job=N`)
 - `src/cvgen/test-drafting-integration.mjs`
 
 ## Counterpart prompt(s)
@@ -43,3 +43,4 @@
 - Unlike the CV path, the response is free text, not JSON: the only check is that it is non-empty. Word-count and style rules are enforced by the prompt, not by code, so the result is `drafted-needs-review`.
 - A failure here is always a CLI, transport or empty-response failure with nothing to correct, so the same input is re-run up to `max_repairs` times after the first call. Each attempt is reported to the dashboard as a retry and keeps its own stderr log; the printed result records `attempts`.
 - The letter body written to `cover-letter.md` is the raw response (trimmed by `wrapCoverLetter`); the PDF is produced separately by `src/cvgen/publish-cover-letter.mjs`.
+- Usage accounting (4.7): each worker call passes `processRun` a `usage` option (function `coverLetter`, the configured model, `--job` id when given). Recording is best effort and never fails the run.

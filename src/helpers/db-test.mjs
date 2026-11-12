@@ -25,10 +25,18 @@ u.pathname = '/' + name;
 for (const file of [
   'src/helpers/test-legacy-import.mjs',
   'src/helpers/test-database.mjs',
+  'src/lib/test-database-resilience.mjs',
+  'src/lib/test-llm-usage-database.mjs',
+  'src/server/test-readiness-database.mjs',
   'src/server/test-jobs-database.mjs',
+  'src/server/test-runs-database.mjs',
+  'src/server/test-runs-service-database.mjs',
+  'src/server/test-jobs-write-database.mjs',
+  'src/server/test-intake-database.mjs',
   'src/eval/test-evaluation-cli.mjs',
   'src/cvgen/test-drafting-integration.mjs',
   'src/helpers/test-backup-restore.mjs',
+  'src/helpers/test-rollback-rehearsal.mjs',
 ]) {
   const result = spawnSync(process.execPath, [file], {
     cwd: root,
@@ -39,11 +47,3 @@ for (const file of [
   if (result.error) throw result.error;
   if (result.status !== 0) process.exit(result.status || 1);
 }
-const go = spawnSync('go', ['test', './...'], {
-  cwd: root + '/dashboard',
-  env: { ...process.env, TEST_DATABASE_URL: u.toString() },
-  stdio: 'inherit',
-  windowsHide: true,
-});
-if (go.error) throw go.error;
-if (go.status !== 0) process.exit(go.status || 1);

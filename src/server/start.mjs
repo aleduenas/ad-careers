@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 import { spawn, spawnSync } from 'node:child_process';
-import { access, realpath } from 'node:fs/promises';
+import { access, realpath, stat } from 'node:fs/promises';
 import { createServer } from 'node:net';
-import { resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import root from '../lib/root.mjs';
 import { createStaticHandler } from './static.mjs';
@@ -24,6 +24,12 @@ export async function startService({
   rootDir = root,
   readiness,
   jobsReader,
+  jobDetailReader,
+  jobsWriter,
+  runsService,
+  intakeService,
+  providersService,
+  letterService,
   openUrl = defaultOpenUrl,
   spawnProcess = spawn,
   stopProcessTree = stopOwnedProcessTree,
@@ -49,14 +55,25 @@ export async function startService({
   } catch {
     throw new Error('Web build is missing. Run npm run web:build.');
   }
+  // Build stamp: mtime of the served index.html, computed once; the page compares it with its own.
+  let buildStamp = 'dev';
+  try {
+    buildStamp = (await stat(resolve(distDir, 'index.html'))).mtime.toISOString();
+  } catch {}
   const { createApp } = await import('./app.mjs');
   const host = `127.0.0.1:${actualPort}`;
   const app = createApp({
     host,
     origin: `http://${host}`,
+    buildStamp,
     ...(readiness ? { readiness } : {}),
     ...(jobsReader ? { jobsReader } : {}),
-    ...(jobsReader ? { jobsReader } : {}),
+    ...(jobDetailReader ? { jobDetailReader } : {}),
+    ...(jobsWriter ? { jobsWriter } : {}),
+    ...(runsService !== undefined ? { runsService } : {}),
+    ...(intakeService !== undefined ? { intakeService } : {}),
+    ...(providersService !== undefined ? { providersService } : {}),
+    ...(letterService !== undefined ? { letterService } : {}),
     logger,
     staticHandler: createStaticHandler({ distDir }),
   });
@@ -132,12 +149,42 @@ export function stopOwnedProcessTree(child) {
   child.kill('SIGKILL');
 }
 
-async function locateNpmCli(cwd) {
+// Finds npm's JavaScript entry point (it is started as `node <cli> run ...`, never through a shell).
+// Order: npm_execpath (set when started by npm), a copy under the repository, the npm installed
+// beside the node binary, then npm found on PATH (its cli sits next to the launcher on Windows, or
+// under ../lib/node_modules next to the real launcher on Unix).
+export async function locateNpmCli(
+  cwd,
+  { env = process.env, execPath = process.execPath, platform = process.platform } = {},
+) {
+  const cli = ['node_modules', 'npm', 'bin', 'npm-cli.js'];
   const candidates = [
-    process.env.npm_execpath,
-    resolve(cwd, 'node_modules/npm/bin/npm-cli.js'),
-  ].filter(Boolean);
-  for (const candidate of candidates) {
+    env.npm_execpath,
+    resolve(cwd, ...cli),
+    resolve(dirname(execPath), ...cli),
+    resolve(dirname(execPath), '..', 'lib', ...cli),
+  ];
+  const names = platform === 'win32' ? ['npm.cmd', 'npm'] : ['npm'];
+  for (const directory of String(env.PATH ?? env.Path ?? '')
+    .split(platform === 'win32' ? ';' : ':')
+    .filter(Boolean)) {
+    for (const name of names) {
+      const launcher = join(directory, name);
+      try {
+        await access(launcher);
+      } catch {
+        continue;
+      }
+      candidates.push(resolve(directory, ...cli));
+      try {
+        candidates.push(resolve(dirname(await realpath(launcher)), '..', 'lib', ...cli));
+        candidates.push(resolve(dirname(await realpath(launcher)), '..', ...cli));
+      } catch {
+        /* the launcher cannot be resolved */
+      }
+    }
+  }
+  for (const candidate of candidates.filter(Boolean)) {
     try {
       await access(candidate);
       return resolve(candidate);
@@ -178,6 +225,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     service = await startService({
       port: process.env.PORT || DEFAULT_PORT,
       noOpen: process.argv.includes('--no-open'),
+      build: !process.argv.includes('--no-build'),
     });
     if (stopping) {
       await service.close();

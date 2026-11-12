@@ -24,3 +24,5 @@
 - Prints one summary line on success; any assertion failure exits non-zero.
 
 The timeout fixture immediately removes its temporary working directory after rejection, exercising the requirement to await child closure before cleanup.
+
+F21 cases: PATH and PATHEXT resolution with an injected platform (exe preferred over cmd, extension and path names, unresolved names, other platforms unchanged), the quoting rules and rejections, and on Windows a real `.cmd` shim started through `processRun` that must receive every argument intact, including a quoted one.

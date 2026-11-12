@@ -51,6 +51,7 @@ by the candidate CV below. The candidate CV remains the sole source of facts.
   },
   "projects": {
     "client_reporting_dashboard": "REPLACE: 60-90 word factual project description if this is one of the 3 selected projects, otherwise an empty string",
+    "client_ats_platform": "REPLACE: 60-90 word factual project description if this is one of the 3 selected projects, otherwise an empty string",
     "entity_resolution_pipeline": "REPLACE: 60-90 word factual project description if this is one of the 3 selected projects, otherwise an empty string",
     "fairness_autoencoder": "REPLACE: 60-90 word factual project description if this is one of the 3 selected projects, otherwise an empty string",
     "portfolio_optimization_agent": "REPLACE: 60-90 word factual project description if this is one of the 3 selected projects, otherwise an empty string",

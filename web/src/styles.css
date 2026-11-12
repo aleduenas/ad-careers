@@ -1,11 +1,12 @@
 :root {
   color-scheme: light;
-  --page: #f7f8fa;
+  /* F17: the page background is a green-tinted grey so margins read as margins; surfaces stay white. */
+  --page: #e3ebe7;
   --paper: #ffffff;
   --paper-soft: #f0f4f2;
   --ink: #202936;
-  --muted: #66717f;
-  --line: #dce3e0;
+  --muted: #5a6573;
+  --line: #cdd8d3;
   --nav: #172b2a;
   --nav-ink: #dbe6e1;
   --nav-muted: #a4b9b0;
@@ -20,6 +21,9 @@
   --red-bg: #fff0f0;
   --focus: #21775d;
   --radius: 12px;
+  /* Page gutters and the widest comfortable content, shared by the pages that adopt them. */
+  --gutter: 16px;
+  --content-max: 1600px;
   font:
     14px/1.5 'Segoe UI',
     system-ui,
@@ -34,8 +38,8 @@
 
 :root[data-theme='dark'] {
   color-scheme: dark;
-  --page: #101714;
-  --paper: #18221e;
+  --page: #090e0c;
+  --paper: #1a2520;
   --paper-soft: #202c26;
   --ink: #e4ece8;
   --muted: #b2c0b9;
@@ -459,33 +463,10 @@ main#main:focus {
   font-size: 13px;
 }
 
-.connection-pill {
-  display: inline-flex;
-  min-height: 30px;
-  flex: none;
-  align-items: center;
-  gap: 8px;
-  padding: 5px 10px;
-  border: 1px solid #cfe4d7;
-  border-radius: 999px;
-  background: var(--green-bg);
-  color: var(--green);
-  font-size: 11px;
-  font-weight: 650;
-}
-
-.connection-pill .status-dot,
 .status-ok .status-dot {
   background: #358467;
 }
 
-.connection-pill.is-error {
-  border-color: #e5c8c9;
-  background: var(--red-bg);
-  color: var(--red);
-}
-
-.connection-pill.is-error .status-dot,
 .status-error .status-dot {
   background: var(--red);
 }
@@ -971,7 +952,12 @@ dialog.dialog:not([open]) {
 .overview-content,
 .job-groups {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
+}
+
+.job-group {
+  min-width: 0;
 }
 
 .inferred-label,
@@ -1389,5 +1375,2554 @@ dialog.dialog:not([open]) {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Package 2.1 carry-overs and 2.2 workspace */
+.results-region {
+  display: grid;
+  gap: 20px;
+  min-width: 0;
+}
+
+.results-region.is-busy {
+  opacity: 0.6;
+}
+
+.results-summary:focus {
+  outline: none;
+}
+
+.job-name a {
+  display: block;
+  color: inherit;
+  text-decoration: none;
+}
+
+.job-name a:hover strong,
+.job-name a:focus-visible strong {
+  text-decoration: underline;
+}
+
+.workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+}
+
+.back-link {
+  width: fit-content;
+  font-weight: 600;
+}
+
+.pane-tabs {
+  display: none;
+  gap: 8px;
+}
+
+.pane-tabs [aria-selected='true'] {
+  border-color: var(--green);
+  color: var(--green);
+  font-weight: 700;
+}
+
+.doc-pane,
+.workspace-section {
+  min-width: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.doc-pane h3,
+.workspace-section h3 {
+  margin: 0 0 10px;
+}
+
+.doc-text {
+  max-height: 70vh;
+  margin: 0;
+  overflow: auto;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.notes-text {
+  max-height: 40vh;
+}
+
+.pane-meta,
+.missing-copy {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.history-table {
+  width: 100%;
+  min-width: 520px;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+
+.history-table th,
+.history-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+  overflow-wrap: anywhere;
+}
+
+.history-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.file-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.file-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.file-list li div {
+  min-width: 0;
+}
+
+.file-list strong,
+.file-list span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.file-list span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 1023px) {
+  .pane-tabs {
+    display: flex;
+  }
+
+  .doc-pane[data-active='false'] {
+    display: none;
+  }
+}
+
+.back-link,
+.file-list a {
+  color: var(--green);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Gate delta: scroll cue for tables and tighter history tables on narrow screens */
+.scroll-hint {
+  display: none;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.table-scroll {
+  background:
+    linear-gradient(to right, var(--paper) 30%, transparent) left center / 36px 100% no-repeat local,
+    linear-gradient(to left, var(--paper) 30%, transparent) right center / 36px 100% no-repeat local,
+    radial-gradient(farthest-side at 0 50%, rgb(0 0 0 / 28%), transparent) left center / 12px 100%
+      no-repeat scroll,
+    radial-gradient(farthest-side at 100% 50%, rgb(0 0 0 / 28%), transparent) right center / 12px
+      100% no-repeat scroll,
+    var(--paper);
+}
+
+@media (max-width: 700px) {
+  .scroll-hint {
+    display: block;
+  }
+
+  .history-table {
+    min-width: 0;
+  }
+
+  .history-table th,
+  .history-table td {
+    padding: 8px 8px;
+  }
+}
+
+/* Package 3.2: workspace editing */
+.edit-grid-outer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+.edit-card {
+  min-width: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.edit-card h3 {
+  margin: 0 0 10px;
+}
+
+.edit-card label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.edit-card label.checkbox-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.edit-card label.checkbox-control input {
+  width: auto;
+  min-height: 0;
+}
+
+.edit-row {
+  max-width: 320px;
+}
+
+.edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px 22px;
+}
+
+.edit-field {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.edit-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.edit-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.edit-value,
+.edit-field .missing-copy {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.edit-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.edit-fieldset {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.edit-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.field-error {
+  margin: 0;
+  color: var(--red);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.success-copy {
+  margin: 10px 0 0;
+  color: var(--green);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.doc-edit {
+  min-height: 320px;
+  max-height: 70vh;
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.jd-editor {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.conflict-text {
+  max-height: 30vh;
+  margin-top: 8px;
+}
+
+.doc-pane .edit-actions {
+  margin-top: 10px;
+}
+
+@media (min-width: 1024px) {
+  .edit-grid-outer {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    align-items: start;
+  }
+}
+
+@media (max-width: 700px) {
+  .history-table th,
+  .history-table td {
+    overflow-wrap: break-word;
+  }
+
+  .history-table th {
+    white-space: nowrap;
+  }
+}
+
+/* Package 3.3: Discover page */
+.discover-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+.discover-card {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.discover-card h3,
+.discover-card h4,
+.discover-card p {
+  margin: 0;
+}
+
+.discover-card h4 {
+  margin-top: 6px;
+}
+
+.paste-step {
+  display: grid;
+  gap: 10px;
+}
+
+.url-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.url-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.notice-ok {
+  border-color: var(--green);
+  background: var(--green-bg);
+}
+
+.run-state {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.run-state .quiet-button {
+  width: fit-content;
+}
+
+.log-tail {
+  max-height: 280px;
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+}
+
+.report-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 10px 16px;
+  margin: 0;
+}
+
+.report-summary dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.report-summary dd {
+  margin: 2px 0 0;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.scan-report {
+  display: grid;
+  gap: 10px;
+}
+
+@media (min-width: 1024px) {
+  .discover-grid {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    align-items: start;
+  }
+}
+
+/* Package 3.7: Providers page */
+.providers-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+.providers-page h2,
+.providers-page h3 {
+  margin: 0;
+}
+
+.provider-list,
+.readiness-list {
+  display: grid;
+  gap: 14px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.provider-row,
+.readiness-row {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.provider-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 14px;
+}
+
+.provider-fields {
+  display: grid;
+  grid-template-columns: minmax(130px, 180px) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 12px;
+}
+
+.source-badge,
+.readiness-badge {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  padding: 3px 10px;
+  border: 1px solid var(--green);
+  border-radius: 999px;
+  background: var(--green-bg);
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.source-badge.is-legacy,
+.readiness-unknown {
+  border-color: var(--line);
+  background: var(--paper-soft);
+  color: var(--muted);
+}
+
+.readiness-notLoggedIn,
+.readiness-unavailable {
+  border-color: var(--red);
+  background: var(--red-bg);
+  color: var(--red);
+}
+
+.readiness-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+.readiness-help {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 13px;
+}
+
+.readiness-help code {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--paper-soft);
+  font-size: 12px;
+}
+
+@media (max-width: 700px) {
+  .provider-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .provider-fields .primary-button {
+    width: 100%;
+  }
+}
+
+.readiness-message {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* Package 3.4: workspace actions and run cards */
+.action-bar {
+  display: grid;
+  gap: 12px;
+}
+
+.action-bar h3,
+.action-bar p {
+  margin: 0;
+}
+
+.action-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px 16px;
+}
+
+.action-item {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+}
+
+.action-item .quiet-button {
+  width: 100%;
+}
+
+.action-reason {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.run-cards {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.run-card {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.run-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.run-card .quiet-button {
+  width: fit-content;
+}
+
+.run-badge {
+  display: inline-flex;
+  padding: 2px 10px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper-soft);
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.run-queued,
+.run-running {
+  border-color: var(--green);
+  background: var(--green-bg);
+  color: var(--green);
+}
+
+.run-completed {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+.run-failed,
+.run-interrupted {
+  border-color: var(--red);
+  background: var(--red-bg);
+  color: var(--red);
+}
+
+.action-dialog {
+  width: min(560px, calc(100vw - 32px));
+}
+
+.action-functions {
+  display: grid;
+  gap: 14px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.action-function {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.action-function > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.action-function label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.action-function label.checkbox-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-function label.checkbox-control input {
+  width: auto;
+  min-height: 0;
+}
+
+.action-override {
+  grid-template-columns: minmax(120px, 160px) minmax(0, 1fr);
+}
+
+@media (max-width: 700px) {
+  .action-override {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Package 3.6: Tasks page and navigation count. */
+.tasks-page {
+  display: grid;
+  gap: 14px;
+}
+
+.tasks-table {
+  width: 100%;
+  min-width: 960px;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 12px;
+}
+
+.tasks-table th,
+.tasks-table td {
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.tasks-table thead th {
+  background: var(--paper-soft);
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.tasks-table tbody th {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.task-toggle {
+  min-height: 32px;
+  padding: 4px 9px;
+}
+
+.tui-badge {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper-soft);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.run-detail-row > td {
+  background: var(--paper-soft);
+}
+
+.run-detail {
+  display: grid;
+  gap: 12px;
+  max-width: 100%;
+}
+
+.run-detail .notice {
+  margin: 0;
+}
+
+.log-follow {
+  display: grid;
+  gap: 8px;
+}
+
+.log-follow-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.nav-count {
+  display: inline-flex;
+  min-width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  margin-left: auto;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: #91e0b7;
+  color: #10201c;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+@media (max-width: 700px) {
+  .nav-count {
+    margin-left: 4px;
+  }
+}
+
+/* Package 3.5: cover-letter editor and PDF line. */
+.letter-section {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.letter-section h4 {
+  margin: 0;
+}
+
+.letter-pdf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0;
+}
+
+.letter-pdf span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Package 4.1 polish delta. */
+.in-page-link {
+  color: var(--green);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.chevron-button {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  margin-right: 6px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.task-action {
+  font-weight: 600;
+}
+
+.run-error {
+  margin: 0;
+  color: var(--red);
+  font-size: 13px;
+}
+
+.run-code {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+/* Folded detail lines: shown only where the minor columns are hidden. */
+.task-extra,
+.job-name .task-extra {
+  display: none;
+}
+
+.task-extra-error {
+  color: var(--red);
+}
+
+/* Grouped Jobs tables share one set of column widths. */
+.jobs-table {
+  table-layout: fixed;
+}
+
+.jobs-table th:nth-child(1) {
+  width: 72px;
+}
+
+.jobs-table th:nth-child(3) {
+  width: 116px;
+}
+
+.jobs-table th:nth-child(4) {
+  width: 72px;
+}
+
+.jobs-table th:nth-child(5) {
+  width: 190px;
+}
+
+.jobs-table th:nth-child(6) {
+  width: 160px;
+}
+
+.jobs-table th:nth-child(7) {
+  width: 120px;
+}
+
+.jobs-table th:nth-child(8) {
+  width: 170px;
+}
+
+@media (max-width: 1100px) {
+  .col-minor {
+    display: none;
+  }
+
+  .task-extra,
+  .job-name .task-extra {
+    display: block;
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .task-extra-error {
+    color: var(--red);
+  }
+
+  .tasks-table {
+    min-width: 0;
+  }
+
+  .jobs-table {
+    min-width: 780px;
+  }
+
+  .jobs-table th:nth-child(2) {
+    width: auto;
+  }
+}
+
+.discard-fieldset legend,
+fieldset legend {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.file-list a,
+.back-link {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+}
+
+@media (max-width: 1100px) {
+  .tasks-table tbody th {
+    white-space: normal;
+  }
+}
+
+/* Package 4.3 deltas (F3, F6, F8, F9). */
+.overview-link {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 8px;
+  margin: 0 -8px;
+  border-bottom: 1px solid var(--line);
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.bucket-list > a:last-child,
+.weekly-list > a:last-child {
+  border-bottom: 0;
+}
+
+.overview-link:hover {
+  background: var(--paper-soft);
+}
+
+.overview-link span {
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+
+.overview-link strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.status-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0 0 12px;
+}
+
+.status-chip {
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.status-chip:hover {
+  background: var(--paper-soft);
+}
+
+.status-chip[aria-pressed='true'] {
+  border-color: var(--green);
+  background: var(--green-bg);
+  color: var(--green);
+  font-weight: 700;
+}
+
+.active-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper-soft);
+}
+
+.report-prose {
+  max-height: 70vh;
+  overflow: auto;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.report-prose > :first-child {
+  margin-top: 0;
+}
+
+.report-prose .rp-h1,
+.report-prose .rp-h2,
+.report-prose .rp-h3,
+.report-prose .rp-h4 {
+  margin: 1.3em 0 0.5em;
+  line-height: 1.3;
+}
+
+.report-prose .rp-h1 {
+  font-size: 20px;
+}
+
+.report-prose .rp-h2 {
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+  font-size: 17px;
+}
+
+.report-prose .rp-h3,
+.report-prose .rp-h4 {
+  font-size: 15px;
+}
+
+.report-prose p,
+.report-prose ul,
+.report-prose ol,
+.report-prose blockquote,
+.report-prose pre {
+  margin: 0 0 0.8em;
+}
+
+.report-prose ul,
+.report-prose ol {
+  padding-left: 22px;
+}
+
+.report-prose blockquote {
+  padding: 2px 14px;
+  border-left: 3px solid var(--line);
+  color: var(--muted);
+}
+
+.report-prose code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--paper-soft);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12.5px;
+}
+
+.report-prose pre {
+  padding: 10px 12px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-soft);
+}
+
+.report-prose pre code {
+  padding: 0;
+  background: none;
+}
+
+.report-prose a {
+  color: var(--green);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.report-prose hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.report-table-scroll {
+  margin: 0 0 0.8em;
+  overflow-x: auto;
+}
+
+.report-prose table {
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.report-prose th,
+.report-prose td {
+  min-width: 7em;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  overflow-wrap: break-word;
+  text-align: left;
+  vertical-align: top;
+}
+
+/* F37: label cells (first column) never break inside a word and keep a readable width. */
+.report-prose th:first-child,
+.report-prose td:first-child {
+  min-width: 9em;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+
+.report-prose th {
+  background: var(--paper-soft);
+}
+
+.action-bar {
+  gap: 8px;
+}
+
+.action-buttons {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px 12px;
+}
+
+/* Package 4.3 F10: model dropdowns, readiness next to a run choice, failed-run log lines. */
+.action-readiness {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+
+.run-last-lines {
+  margin: 0;
+  padding: 8px 10px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-soft);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* Package 4.3 F11 (D067): full-page workspace without cards. */
+.ws-plain {
+  display: grid;
+  gap: 18px;
+  padding: 24px 28px;
+}
+
+.ws-bar {
+  display: grid;
+  gap: 8px;
+  padding: 12px 24px 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.ws-bar-main,
+.ws-bar-bare {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.ws-bar-bare {
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.ws-bar h1 {
+  margin: 0;
+  min-width: 0;
+  flex: 1 1 260px;
+  font-size: 20px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.ws-chrome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.ws-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 22px;
+  margin: 0;
+}
+
+.ws-facts > div {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ws-facts dt,
+.ws-materials span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ws-facts dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ws-facts small {
+  display: block;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.ws-facts a,
+.ws-materials a {
+  color: var(--green);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ws-materials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 22px;
+  font-size: 13px;
+}
+
+.ws-materials > div {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ws-material-button {
+  min-height: 28px;
+  padding: 2px 10px;
+  font-size: 12px;
+}
+
+.ws-material-reason {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+.ws-materials em {
+  color: var(--muted);
+  font-style: normal;
+}
+
+.ws-body {
+  display: block;
+}
+
+.ws-center {
+  min-width: 0;
+}
+
+.ws-split {
+  display: block;
+}
+
+.ws-divider {
+  display: none;
+}
+
+.ws .doc-pane,
+.ws .workspace-section,
+.ws-panel .edit-card {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+.ws .doc-pane {
+  padding: 14px 24px 24px;
+}
+
+.ws .doc-pane h3 {
+  margin-top: 0;
+}
+
+.ws-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ws-rail-button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ws-rail-button:hover {
+  background: var(--paper-soft);
+}
+
+.ws-rail-button[aria-expanded='true'] {
+  border-color: var(--green);
+  background: var(--green-bg);
+  color: var(--green);
+  font-weight: 700;
+}
+
+.ws-panel {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.ws-panel[hidden] {
+  display: none;
+}
+
+.ws-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ws-panel-head h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.ws-panel-body {
+  display: grid;
+  flex: 1;
+  align-content: start;
+  gap: 22px;
+  min-height: 0;
+  padding: 18px 20px 28px;
+  overflow: auto;
+}
+
+.ws-panel-body h3 {
+  margin: 0 0 10px;
+}
+
+.ws-section {
+  display: grid;
+  gap: 10px;
+}
+
+.ws .doc-text,
+.ws .report-prose {
+  max-height: none;
+}
+
+@media (min-width: 701px) {
+  .app-shell.is-workspace {
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .is-workspace .sidebar {
+    padding: 14px 6px;
+    min-height: 0;
+  }
+
+  .is-workspace .brand > span:last-child,
+  .is-workspace .nav-heading,
+  .is-workspace .sidebar-foot {
+    display: none;
+  }
+
+  .is-workspace .brand {
+    justify-content: center;
+    margin-bottom: 14px;
+  }
+
+  .is-workspace .sidebar nav a {
+    justify-content: center;
+    padding: 9px 0;
+    gap: 0;
+    font-size: 0;
+  }
+
+  .is-workspace .sidebar nav a > span:first-child {
+    width: auto;
+    font-size: 16px;
+  }
+
+  .is-workspace .sidebar nav a .nav-count {
+    display: none;
+  }
+
+  .is-workspace main#main {
+    max-width: none;
+    padding: 0;
+  }
+}
+
+@media (min-width: 1024px) {
+  .is-workspace .main-shell {
+    height: 100vh;
+    min-height: 0;
+  }
+
+  .is-workspace main#main {
+    display: flex;
+    min-height: 0;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .workspace.ws {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .ws-body {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+  }
+
+  .ws-center {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+  }
+
+  .ws-split {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+  }
+
+  .ws-split > .doc-pane {
+    min-width: 0;
+    overflow: auto;
+  }
+
+  .ws-split > .doc-pane:first-child {
+    flex: 0 0 calc(var(--ws-left, 50%) - 4px);
+  }
+
+  .ws-split > .doc-pane:last-child {
+    flex: 1 1 0;
+  }
+
+  .ws-divider {
+    display: block;
+    flex: 0 0 8px;
+    cursor: col-resize;
+    background: var(--line);
+    touch-action: none;
+  }
+
+  .ws-divider:hover,
+  .ws-divider:focus-visible {
+    background: var(--green);
+  }
+
+  .ws-rail {
+    flex: 0 0 68px;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding: 10px 6px;
+    border-bottom: 0;
+    border-left: 1px solid var(--line);
+    background: var(--paper);
+  }
+
+  .ws-rail-button {
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 2px;
+    font-size: 11px;
+  }
+
+  .ws-panel {
+    inset: 0 68px 0 auto;
+    width: min(50vw, 760px);
+    border-left: 1px solid var(--line);
+    box-shadow: -8px 0 28px #10201c33;
+  }
+}
+
+.ws-panel .edit-grid-outer {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.ws-panel .action-bar > h3 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Below 1024 px the tool rail is a bar fixed to the bottom of the viewport. */
+@media (max-width: 1023px) {
+  .workspace.ws {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .ws-rail {
+    position: fixed;
+    z-index: 30;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--line);
+    border-bottom: 0;
+    background: var(--paper);
+  }
+
+  .ws-rail-button {
+    min-width: 0;
+    flex: 1 1 0;
+    justify-content: center;
+    padding: 6px 4px;
+  }
+}
+
+@media (min-width: 701px) and (max-width: 1023px) {
+  .ws-rail {
+    left: 56px;
+  }
+}
+
+/* Package 4.3 F12: breathing room in the workspace; F13: Add a job on the Jobs page; F14: details. */
+@media (min-width: 701px) {
+  :root {
+    --gutter: 32px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --gutter: 44px;
+  }
+}
+
+.ws-bar {
+  gap: 0;
+  padding: 18px max(var(--gutter), calc((100% - var(--content-max)) / 2)) 0;
+}
+
+.ws-bar-main {
+  padding-bottom: 16px;
+}
+
+.ws-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 36px;
+  padding: 12px 0 14px;
+  border-top: 1px solid var(--line);
+}
+
+.ws-bar-bare {
+  padding-right: var(--gutter);
+  padding-left: var(--gutter);
+}
+
+.ws-rail {
+  padding-right: var(--gutter);
+  padding-left: var(--gutter);
+}
+
+.ws .doc-pane {
+  padding: 22px var(--pane-pad, 28px) 40px;
+}
+
+.ws .doc-text {
+  max-width: 80ch;
+  line-height: 1.65;
+}
+
+.ws .report-prose {
+  line-height: 1.7;
+}
+
+/* F22: the report uses the whole pane; only running text keeps a readable line length. */
+.ws .report-prose > p,
+.ws .report-prose > ul,
+.ws .report-prose > ol,
+.ws .report-prose > blockquote {
+  max-width: 75ch;
+}
+
+.ws-plain {
+  padding-right: var(--gutter);
+  padding-left: var(--gutter);
+}
+
+@media (min-width: 1024px) {
+  .ws-split {
+    width: 100%;
+    max-width: var(--content-max);
+    margin-inline: auto;
+    padding-inline: max(0px, calc(var(--gutter) - 28px));
+    --pane-pad: 28px;
+  }
+
+  .ws-rail {
+    padding-right: 6px;
+    padding-left: 6px;
+  }
+}
+
+.jobs-add {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.jobs-add-toggle {
+  width: fit-content;
+  font-weight: 700;
+}
+
+.error-details {
+  display: grid;
+  gap: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.error-details summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.ws-bar-bare {
+  padding-bottom: 14px;
+}
+
+/* Package 4.3 F16: persistent notice when the running service is older than this page. */
+.app-shell {
+  --banner-h: 44px;
+}
+
+.build-banner {
+  position: fixed;
+  z-index: 90;
+  top: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  min-height: var(--banner-h);
+  align-items: center;
+  padding: 6px var(--gutter, 16px);
+  background: var(--orange-bg);
+  border-bottom: 1px solid #ead8b8;
+  color: var(--orange);
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.app-shell.has-banner {
+  padding-top: var(--banner-h);
+}
+
+.app-shell.has-banner .sidebar {
+  top: var(--banner-h);
+}
+
+@media (max-width: 700px) {
+  .app-shell {
+    --banner-h: 64px;
+  }
+
+  /* The banner is part of the page flow here, so its real height pushes everything down and the
+     relatively positioned navigation never gets an offset that could cover a control. */
+  .build-banner {
+    position: static;
+  }
+
+  .app-shell.has-banner {
+    padding-top: 0;
+  }
+
+  .app-shell.has-banner .sidebar {
+    top: 0;
+  }
+}
+
+@media (min-width: 701px) and (max-width: 1023px) {
+  .app-shell {
+    --banner-h: 52px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .app-shell.has-banner .sidebar {
+    height: calc(100vh - var(--banner-h));
+  }
+
+  .app-shell.has-banner.is-workspace .main-shell {
+    height: calc(100vh - var(--banner-h));
+  }
+}
+
+.report-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+/* Package 4.3 F17: surfaces on a different page colour. The bar, both panes, the tool rail, the
+   slide-outs and the Jobs list are paper; everything between them is the page. */
+.ws .doc-pane {
+  margin: 12px var(--gutter);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.jobs-controls {
+  background: var(--paper);
+}
+
+@media (min-width: 1024px) {
+  .ws-split {
+    max-width: var(--content-max);
+    margin-inline: auto;
+    padding: 16px 0;
+  }
+
+  .ws-split > .doc-pane {
+    margin: 0;
+  }
+
+  .ws-split > .doc-pane:first-child {
+    flex: 0 0 calc(var(--ws-left, 50%) - 4px - var(--gutter));
+    margin-left: var(--gutter);
+  }
+
+  .ws-split > .doc-pane:last-child {
+    flex: 1 1 0;
+    margin-right: var(--gutter);
+  }
+
+  .ws-divider {
+    background: transparent;
+    position: relative;
+  }
+
+  .ws-divider::after {
+    content: '';
+    position: absolute;
+    inset: 0 3px;
+    border-radius: 2px;
+    background: var(--line);
+  }
+
+  .ws-divider:hover::after,
+  .ws-divider:focus-visible::after {
+    background: var(--green);
+  }
+}
+
+/* Package 4.3 F18: the Service page and the attention dot on its navigation entry. */
+.nav-dot {
+  width: 9px;
+  height: 9px;
+  margin-left: auto;
+  border-radius: 50%;
+  background: var(--red);
+  box-shadow: 0 0 0 2px var(--nav);
+}
+
+.service-page {
+  display: grid;
+  gap: 16px;
+}
+
+.service-page h2 {
+  margin: 0 0 12px;
+  font-size: 17px;
+}
+
+.service-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px 24px;
+  margin: 0;
+}
+
+.service-facts dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.service-facts dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.service-table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+
+.service-table th,
+.service-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  font-weight: 500;
+}
+
+.service-table thead th {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.service-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+.error-details > span {
+  display: block;
+}
+
+/* Package 4.3 F22 to F24: report header grid, wide tables, panes without bubbles. */
+.report-fields {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 20px;
+  margin: 0 0 1.2em;
+}
+
+.report-fields > div {
+  display: contents;
+}
+
+.report-fields dt {
+  font-weight: 700;
+}
+
+.report-fields dd {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.report-prose table {
+  width: 100%;
+}
+
+.report-prose th {
+  white-space: nowrap;
+}
+
+.report-prose td:not(:first-child):not(:last-child) {
+  min-width: 5.5ch;
+  white-space: nowrap;
+}
+
+.report-prose td:last-child:not(:first-child) {
+  min-width: 28ch;
+}
+
+.ws .doc-pane {
+  margin: 0 var(--gutter);
+  padding: 0 var(--pane-pad, 28px);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--paper);
+}
+
+.ws .doc-pane > h3 {
+  margin: 0;
+  padding: 0 0 10px;
+}
+
+@media (min-width: 1024px) {
+  .ws-split {
+    padding: 0;
+  }
+
+  .ws-split > .doc-pane {
+    margin: 0;
+  }
+
+  .ws-split > .doc-pane:first-child {
+    margin-left: var(--gutter);
+  }
+
+  .ws-split > .doc-pane:last-child {
+    margin-right: var(--gutter);
+  }
+}
+
+.build-banner {
+  gap: 12px;
+}
+
+.build-banner > span {
+  flex: 1 1 auto;
+}
+
+.build-banner button {
+  min-height: 32px;
+  flex: none;
+  padding: 4px 12px;
+}
+
+/* Package 4.3 F30: pane titles are a shaded header strip across the pane, sticky while it scrolls. */
+.ws .doc-pane > h3 {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  margin: 0 calc(-1 * var(--pane-pad, 28px));
+  padding: 12px var(--pane-pad, 28px);
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-soft);
+}
+
+.ws .doc-pane > h3 + * {
+  margin-top: 16px;
+}
+
+.app-shell.has-banner .ws .doc-pane > h3 {
+  top: 0;
+}
+
+@media (max-width: 1023px) {
+  .app-shell.has-banner .ws .doc-pane > h3 {
+    top: var(--banner-h);
+  }
+}
+
+/* Package 4.3 F31 to F33: quick status buttons and a compact Jobs toolbar. */
+.quick-moves {
+  display: grid;
+  gap: 4px;
+}
+
+.quick-moves-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.quick-move {
+  min-height: 30px;
+  padding: 3px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.quick-move-next {
+  border-color: var(--green);
+  background: var(--green-bg);
+  color: var(--green);
+}
+
+.quick-move-next:hover:not(:disabled) {
+  background: var(--green);
+  color: var(--paper);
+}
+
+.quick-move-reject {
+  border-color: var(--red);
+  background: var(--red-bg);
+  color: var(--red);
+}
+
+.quick-move-reject:hover:not(:disabled),
+.quick-move-reject.is-confirming {
+  background: var(--red);
+  color: var(--paper);
+}
+
+.quick-discard {
+  min-width: min(200px, 100%);
+  gap: 8px;
+}
+
+.quick-discard .edit-fieldset {
+  margin: 0;
+  padding: 8px 10px;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.quick-discard .edit-fieldset legend {
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.quick-discard .edit-fieldset select,
+.quick-discard .edit-fieldset input {
+  min-height: 30px;
+  font-size: 12px;
+}
+
+.quick-move-notice {
+  max-width: 26ch;
+  margin: 0;
+  color: var(--orange);
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.ws-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.move-cell {
+  min-width: 216px;
+  vertical-align: middle;
+}
+
+.jobs-table th:nth-child(9) {
+  width: 176px;
+}
+
+main#main[data-page='jobs'] {
+  padding-top: 16px;
+}
+
+.jobs-toolbar {
+  display: grid;
+  gap: 10px;
+  margin: 0 0 12px;
+}
+
+.jobs-toolbar-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 16px;
+}
+
+.jobs-title {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.jobs-toolbar .search-control {
+  display: block;
+  width: min(100%, 320px);
+  flex: 1 1 220px;
+}
+
+.jobs-toolbar .search-control input {
+  width: 100%;
+  min-height: 36px;
+}
+
+.jobs-toolbar .jobs-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+
+.compact-control {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.jobs-toolbar .jobs-controls > label:not(.checkbox-control) {
+  min-width: 0;
+}
+
+.jobs-toolbar .jobs-controls select {
+  min-height: 32px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.jobs-add-button {
+  min-height: 34px;
+  margin-left: auto;
+  padding: 5px 14px;
+}
+
+.ws-panel-solo {
+  /* No rail beside it on the Jobs page. */
+}
+
+@media (min-width: 1024px) {
+  .ws-panel.ws-panel-solo {
+    right: 0;
+  }
+}
+
+.status-chips {
+  margin: 0;
+}
+
+.jobs-toolbar .search-control {
+  width: min(100%, 260px);
+  flex: 1 1 160px;
+}
+
+.jobs-toolbar-row {
+  gap: 10px 12px;
+}
+
+.jobs-toolbar .jobs-controls {
+  gap: 6px 10px;
+}
+
+.jobs-toolbar .jobs-controls > label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.compact-control > span {
+  white-space: nowrap;
+}
+
+.jobs-toolbar .search-control {
+  width: min(100%, 200px);
+  flex: 0 1 200px;
+}
+
+/* The Move column needs room, so the other columns are a little narrower and the table scrolls
+   inside its own region instead of crushing the company name. */
+.jobs-table {
+  min-width: 1160px;
+}
+
+.jobs-table th:nth-child(5) {
+  width: 150px;
+}
+
+.jobs-table th:nth-child(6) {
+  width: 140px;
+}
+
+.jobs-table th:nth-child(7) {
+  width: 100px;
+}
+
+.jobs-table th:nth-child(8) {
+  width: 130px;
+}
+
+.jobs-table th:nth-child(9) {
+  width: 168px;
+}
+
+@media (max-width: 1100px) {
+  .jobs-table {
+    min-width: 960px;
+  }
+}
+
+/* Package 4.3 F34: a primary action button with a smaller "with model" companion. */
+.action-pair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.action-with-model {
+  min-height: 30px;
+  padding: 3px 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Package 4.7: Cost page. Flat panes, green tokens, plain CSS bars. */
+.cost-page {
+  display: grid;
+  gap: 18px;
+}
+
+.cost-bar-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+.cost-bar-controls .filter-chips,
+.cost-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cost-bar-controls button[aria-pressed='true'] {
+  border-color: var(--green);
+  background: var(--green-bg);
+  color: var(--green);
+  font-weight: 700;
+}
+
+.cost-note {
+  margin: 0;
+}
+
+.cost-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.cost-card {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+}
+
+.cost-card span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.cost-card strong {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cost-section {
+  display: grid;
+  gap: 8px;
+}
+
+.cost-section h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.cost-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.cost-table th,
+.cost-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.cost-table thead th {
+  background: var(--paper-soft);
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.cost-table tbody th {
+  font-weight: 600;
+}
+
+.cost-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cost-nowrap {
+  white-space: nowrap;
+}
+
+.cost-sub {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.cost-days-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.cost-days {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: calc(var(--days, 1) * 18px);
+  height: 190px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cost-days li {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  height: 100%;
+}
+
+.cost-bar-slot {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  flex: 1 1 auto;
+  border-radius: 4px;
+}
+
+.cost-bar {
+  display: block;
+  width: 100%;
+  height: var(--bar);
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  background: var(--green);
+}
+
+.cost-bar-value {
+  position: absolute;
+  bottom: calc(var(--bar) + 6px);
+  left: 50%;
+  z-index: 2;
+  display: none;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 15%);
+  font-size: 12px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.cost-bar-slot:hover .cost-bar-value,
+.cost-bar-slot:focus-visible .cost-bar-value {
+  display: block;
+}
+
+.cost-days li:first-child .cost-bar-value {
+  left: 0;
+  transform: none;
+}
+
+.cost-days li:last-child .cost-bar-value {
+  right: 0;
+  left: auto;
+  transform: none;
+}
+
+.cost-day-label {
+  min-height: 12px;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.cost-days-table summary {
+  cursor: pointer;
+  color: var(--green);
+  font-size: 13px;
+}
+
+/* Package 4.3 F39: the cover letter opens in a centered plain-text editor. */
+.ws-material-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--green);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.letter-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(780px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 18px 22px;
+}
+
+.letter-modal:not([open]) {
+  display: none;
+}
+
+.letter-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.letter-modal-head h2 {
+  margin: 0;
+  padding-right: 40px;
+  font-size: 18px;
+}
+
+.letter-modal .dialog-close {
+  top: 12px;
+  right: 14px;
+}
+
+.letter-modal .letter-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.letter-modal .doc-edit {
+  min-height: min(58dvh, 560px);
+  padding: 14px 16px;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.65;
+  resize: vertical;
+}
+
+.letter-modal-read {
+  max-height: 58dvh;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.letter-modal-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.letter-modal-file {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 600px) {
+  .letter-modal {
+    top: 0;
+    left: 0;
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    padding: 14px 16px;
+    transform: none;
+    border-radius: 0;
+  }
+
+  .letter-modal .doc-edit {
+    min-height: 50dvh;
+    flex: 1 1 auto;
   }
 }

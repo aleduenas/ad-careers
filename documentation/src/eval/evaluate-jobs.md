@@ -1,12 +1,13 @@
 # src/eval/evaluate-jobs.mjs
 
 **Kind:** launcher
-**Purpose:** The standalone job-evaluation launcher. It selects Pending jobs, runs a location gate for non-manual jobs, company and role-market research, and the scored evaluation worksheet through an isolated subscription CLI worker (claude or codex), renders the Markdown report and publishes each result to PostgreSQL under a lease. JDs carrying the manual-intake frontmatter marker skip the location gate because dashboard intake already represents the user's eligibility decision. It exists so evaluation is deterministic, resumable and archived, and never improvised by an interactive agent.
+**Purpose:** The standalone job-evaluation launcher. It selects Pending jobs (or, by explicit `--job=ID`, an Evaluated job to re-evaluate; the status stays Evaluated and a new history row and report are written), runs a location gate for non-manual jobs, company and role-market research, and the scored evaluation worksheet through an isolated subscription CLI worker (claude or codex), renders the Markdown report and publishes each result to PostgreSQL under a lease. JDs carrying the manual-intake frontmatter marker skip the location gate because dashboard intake already represents the user's eligibility decision. It exists so evaluation is deterministic, resumable and archived, and never improvised by an interactive agent.
 
 ## Run
-`node src/eval/evaluate-jobs.mjs --job=123 | --select="company role" | --next=5 [--provider=claude|codex] [--dry-run] [--prepare-only]`
+`node src/eval/evaluate-jobs.mjs --job=123 | --select="company role" | --next=5 [--provider=claude|codex] [--model=ID] [--research-provider=claude|codex] [--research-model=ID] [--dry-run] [--prepare-only]`
 - `--job=ID` / `--select=terms` / `--next=N`: exactly one selector (resolved through `src/eval/next-jobs.mjs`; `--job` must be a numeric permanent ID that is still Pending).
 - `--provider`: `claude` (default) or `codex`; must match the run on `--resume`.
+- `--model=ID`: evaluation model for this run only (at most 80 characters, no control characters); absent keeps the configured model. `--research-provider=claude|codex` and `--research-model=ID` do the same for the gate, company research and role-market calls (default: the evaluation provider and its configured research model). The browser dashboard passes its saved provider selection through these flags; terminal use is unchanged without them.
 - `--dry-run`: print provider, models and selected jobs; no run folder, no CLI, no DB writes.
 - `--prepare-only`: create the run folder with prompt sources and gate prompts, acquire and release the run lease, no CLI calls; prints `Run: <id>`.
 - `--resume=RUN_ID`: reload `logs/evaluation/<id>/run.json`; cannot be combined with selectors or preparation; a completed run just prints its results.
@@ -37,7 +38,7 @@
 - `src/lib/_task-status.mjs` (`reportPhase`)
 
 ## Used by
-- `dashboard/workflow.go` (action `evaluate` runs `--job=N`; exit 2 is shown as "needs attention"), `dashboard/workflow_test.go`
+- `src/server/runs.mjs` (browser action `evaluate` runs `--job=N`; exit 2 is shown as "needs attention")
 - `src/eval/test-evaluation-cli.mjs` (spawns a fixture copy with a mocked CLI when `TEST_DATABASE_URL` is set)
 
 ## Counterpart prompt(s)

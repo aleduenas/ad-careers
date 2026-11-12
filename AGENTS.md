@@ -7,12 +7,12 @@ needs to know who the candidate is. See `documentation/guides/layout.md`, rule 8
 
 ## What this repository is
 
-A dashboard-first job-search backend. The Go TUI in `dashboard/` is the product; it shells out to
-deterministic Node launchers under `src/` (scan portals, ingest a pasted JD, evaluate a job, draft a
-CV or cover letter, publish a PDF). Launchers make isolated subscription-CLI calls with versioned
-prompts from `llm/prompts/`. PostgreSQL (`infra/`) is the only operational store. Layout, rules and
-"what moved where" are in `documentation/guides/layout.md`; start every task by reading
-`documentation/index.md`.
+A dashboard-first job-search backend. The browser dashboard (`web/`, served by the local Node server
+in `src/server/`) is the product; it runs deterministic Node launchers under `src/` (scan portals,
+ingest a pasted JD, evaluate a job, draft a CV or cover letter, publish a PDF). Launchers make
+isolated subscription-CLI calls with versioned prompts from `llm/prompts/`. PostgreSQL (`infra/`) is
+the only operational store. Layout, rules and "what moved where" are in
+`documentation/guides/layout.md`; start every task by reading `documentation/index.md`.
 
 There is no conversational workflow layer any more: the former `modes/` and skill routers were
 retired on 2026-09-19 (archive under `data/archive/modes-retired-2026/`). A session's job here is
@@ -31,7 +31,7 @@ code maintenance, running documented commands, and keeping documentation in step
    Never edit an applied migration.
 3. **Private data stays private.** `config/` (except README and `examples/`), `llm/compacted/`,
    `data/`, `output/`, `logs/` are gitignored candidate material or work product. Never commit them,
-   never quote candidate facts into `src/`, `llm/prompts/`, `dashboard/`, `documentation/` or this
+   never quote candidate facts into `src/`, `llm/prompts/`, `web/`, `documentation/` or this
    file. Facts enter prompts only at run time from `config/` and `llm/compacted/`.
 4. **Never sync from any upstream remote.** This copy diverged permanently; there is no update
    mechanism.
@@ -44,11 +44,8 @@ code maintenance, running documented commands, and keeping documentation in step
 7. **No unrequested side effects.** Evaluating a job never generates a CV or PDF; scoring is never
    a gate on any explicit user action.
 8. **Tests and builds.** `node src/test-all.mjs --quick` before reporting done (`npm test` runs the
-   full suite including the dashboard build). Isolated database integration: `node
-   src/helpers/db-test.mjs` (never against the personal database). After any change under
-   `dashboard/`, rebuild the real binary: `go build -o dashboard.exe .` from `dashboard/`; a
-   temporary test build is not sufficient. If Windows locks the running exe, ask the user to close
-   the dashboard and finish the rebuild.
+   full suite including the web production build). Isolated database integration: `node
+   src/helpers/db-test.mjs` (never against the personal database).
 9. **Documentation is part of the change.** Every source file has a page under
    `documentation/<same path>.md`; adding or moving a file means adding or moving its page.
    Launcher and prompt are a pair: a placeholder or response key renamed in one is renamed in the
@@ -67,7 +64,7 @@ code maintenance, running documented commands, and keeping documentation in step
 | CV / letter drafting | `documentation/guides/CV_DRAFTING.md` |
 | Database, statuses, backup/restore, legacy recovery | `documentation/guides/database.md` |
 | Private vs system files | `documentation/guides/DATA_CONTRACT.md` |
-| Per-file reference | `documentation/src/`, `documentation/llm/`, `documentation/infra/`, `documentation/dashboard/`, `documentation/config/` |
+| Per-file reference | `documentation/src/`, `documentation/llm/`, `documentation/infra/`, `documentation/web/`, `documentation/config/` |
 | Cleanup history and decisions | `documentation/history/` |
 
 ## hiring.cafe provider contract (mandatory)
@@ -94,8 +91,8 @@ hiring.cafe is a standard scan provider (`src/scan/providers/hiring-cafe.mjs`), 
 ## Conventions
 
 Node ESM (`.mjs`), YAML/JSON configuration, Playwright for PDF rendering and browser fallbacks,
-Go for the dashboard. All `.mjs` source is formatted with Prettier (`.prettierrc.json`, printWidth
-100, 2-space indent, single quotes, semicolons, trailing commas); this is the JS/TS equivalent of
-PEP 8. Run `npx prettier --write <file>` after editing a `.mjs` file, or `npm run format` for the
-whole tree; `npm run format:check` verifies without writing. Report outcomes faithfully: failing
-tests are reported as failing, skipped steps as skipped.
+React/Vite/TypeScript for the browser dashboard. All `.mjs` source is formatted with Prettier
+(`.prettierrc.json`, printWidth 100, 2-space indent, single quotes, semicolons, trailing commas);
+this is the JS/TS equivalent of PEP 8. Run `npx prettier --write <file>` after editing a `.mjs`
+file, or `npm run format` for the whole tree; `npm run format:check` verifies without writing.
+Report outcomes faithfully: failing tests are reported as failing, skipped steps as skipped.

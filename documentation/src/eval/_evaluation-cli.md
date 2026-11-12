@@ -28,7 +28,7 @@ Not runnable; imported by other modules.
 
 ## Used by
 - `src/eval/evaluate-jobs.mjs`, `src/eval/test-evaluation-cli.mjs`, `src/eval/test-evaluation-worksheet.mjs`
-- `dashboard/internal/data/career.go` parses the report layout produced by `render` (referenced in a comment)
+- `src/server/jobs-detail.mjs` and `src/server/jobs-materials.mjs` read the report layout produced by `render`
 
 ## Counterpart prompt(s)
 - none (renders `eval/company-research.md` and `eval/repair.md` on behalf of the launcher; see `documentation/src/eval/evaluate-jobs.md`)
@@ -41,3 +41,4 @@ Not runnable; imported by other modules.
 - `invoke`: checkpoint keyed by sha256 of prompt+provider+config+research (+ `version: 4`), so identical calls return the cached validated value; each attempt runs in a fresh `temporaryWorker` folder; codex gets `--json`; research web tools only on attempt 0 (repairs run without tools); JSON fences are stripped; with a contract the answer must preserve the worksheet shape (`sameShape`); partial research sections accumulate across attempts; up to `max_repairs` retries append `repair.md`; after the last failure a partially valid research result is still returned.
 - `pool` runs `fn` over items with bounded concurrency and rethrows the first rejection.
 - Observation: `cachedJD` is exported and tested, but the launcher reads JDs from PostgreSQL rather than through this helper.
+- Usage accounting (4.7): `usageFunction(phase)` maps the phase names to llm_calls labels (`research` becomes `companyResearch`; `gate`, `market` and `evaluation` stay; smoke phases become `smoke`). `invoke` passes `processRun` a `usage` option with the configured model, that label, the job id taken from the numeric run sub-folder (none for company research) and the `.stdout.log` path as `log_ref`, so the backfill and the live hook never double-count a log.

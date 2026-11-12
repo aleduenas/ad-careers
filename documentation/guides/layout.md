@@ -12,7 +12,7 @@ career-ops/
 ├── .claude/                      Claude Code settings for development sessions
 ├── package.json
 │
-├── src/                          backend the dashboard shells out to
+├── src/                          backend the dashboard server and launchers
 │   ├── lib/                      modules imported by more than one function; never run directly
 │   ├── helpers/                  runnable admin/maintenance commands (db-*, move-status, sync-jds, verify-*, prune-*)
 │   ├── cvgen/                    CV and cover-letter generation + PDF rendering; templates/ for HTML + fonts
@@ -25,7 +25,7 @@ career-ops/
 │   ├── sql/                      migrations/ (immutable, ordered) and schema.sql (generated snapshot)
 │   └── docker/                   compose.yml, .env.example, setup-windows.ps1
 │
-├── dashboard/                    Go TUI and the deployed dashboard.exe
+├── web/                          browser dashboard (React/Vite/TypeScript); web/dist/ is generated
 │
 ├── llm/                          everything an LLM *worker* (evaluator, CV writer) reads
 │   ├── prompts/cvgen/            worksheets, writing style guide, paragraph worksheet
@@ -43,7 +43,7 @@ career-ops/
 
 ## Browser migration source locations
 
-The reviewed browser migration adds these locations alongside the retained Go dashboard.
+The reviewed browser migration adds these locations next to the backend. The Go TUI that preceded it was retired (see `documentation/history/tui-retirement-2026-11.md`).
 The application remains local; PostgreSQL and the existing workflow launchers keep their roles.
 
 | Location | Responsibility |
@@ -57,20 +57,20 @@ The application remains local; PostgreSQL and the existing workflow launchers ke
 Keep one root npm manifest/lockfile for application dependencies and build scripts. Each new
 maintained source/configuration file receives its mirrored reference page. Generated types/build
 output are ignored and excluded from maintained-source documentation coverage. Root build/test
-integration preserves existing checks and the retained Go build until explicit retirement.
+integration covers the server and web checks.
 
 ## Rules
 
 1. **Functions own their code and tests.** A script goes in the `src/<function>/` it serves; its tests sit beside it as `test-*.mjs`. `src/lib/` only holds modules imported by two or more functions. `src/helpers/` only holds commands a person runs by hand.
 2. **Prompts live in `llm/`, never in `src/`.** A launcher references its prompt by path. Launcher and prompt are a pair: the documentation page of each names the other.
 3. **Two sizes of every candidate document.** The full version lives in `config/`; if a worker needs a token-cheap version it lives in `llm/compacted/` with the same base name plus `-compact`, and both carry a sync note. Today: `config/cv.md ↔ llm/compacted/cv-compact.md`, `config/profile.md ↔ llm/compacted/candidate-targeting.md`.
-4. **Candidate material never enters `src/`, `llm/prompts/`, `dashboard/` or `documentation/`.** Facts come from `config/` and `llm/compacted/` at run time.
+4. **Candidate material never enters `src/`, `llm/prompts/`, `web/` or `documentation/`.** Facts come from `config/` and `llm/compacted/` at run time.
 5. **Root resolution goes through `src/lib/root.mjs`.** No script computes the repository root from its own depth.
 6. **PostgreSQL is the only writable store for jobs, statuses and evaluations.** Folders under `data/` are readable caches or personal work product; paths stored in the database are relative to the repository root.
 7. **Every source file has a page** under `documentation/` mirroring the source path, with its final extension replaced by `.md` (for example `src/scan/scan.mjs` becomes `documentation/src/scan/scan.md`), describing purpose, inputs, outputs, what imports it and what it imports. Adding a file means adding its page; `src/test-all.mjs` checks for missing pages.
 8. **Dev-session and worker instructions never mix.** `AGENTS.md`/`.claude/` describe how to work on the repo and contain no career context; `llm/` contains no repository-maintenance instructions.
 9. **Migrations are immutable.** Schema changes are new numbered files in `infra/sql/migrations/`; `schema.sql` is regenerated, never hand-edited.
-10. **After any change under `dashboard/`, rebuild the real binary:** `go build -o dashboard.exe .` from `dashboard/`.
+10. **After any change under `web/`, rebuild the served bundle:** `npm run web:build`, then `npm run web:restart` so the running service serves it.
 
 ## Artifact identity
 

@@ -28,6 +28,19 @@ const config = {
     ...JSON.parse(readFileSync(join(root, 'config/cv-drafting.json'), 'utf8')),
   },
   provider = options.provider || config.default_provider;
+// --model=<id> overrides the configured model for this run only (browser dashboard dispatch).
+function modelFlag(value, name = 'model') {
+  // eslint-disable-next-line no-control-regex
+  if (
+    typeof value !== 'string' ||
+    !value.trim() ||
+    value.length > 80 ||
+    /[\u0000-\u001f\u007f]/.test(value)
+  )
+    throw new Error('--' + name + ' needs a model id of at most 80 characters');
+  return value.trim();
+}
+if (options.model !== undefined) config[provider + '_model'] = modelFlag(options.model);
 if (!Number.isInteger(config.max_repairs) || config.max_repairs < 0 || config.max_repairs > 3)
   throw new Error('max_repairs must be 0–3');
 const selection = options.job
@@ -111,6 +124,12 @@ await withOutputLock(archive, selection.out, 'letter', runId, async () => {
         cwd,
         input: context,
         timeout: config.timeout_ms,
+        usage: {
+          provider,
+          model: config[provider + '_model'],
+          fn: 'coverLetter',
+          jobId: options.job ? String(options.job) : null,
+        },
       });
       logTokenUsage(root, {
         provider,

@@ -4,10 +4,10 @@
 **Purpose:** Generates a tailored CV PDF for one job with an isolated subscription CLI call and up to `max_repairs` bounded repair calls when needed. It substitutes the cached JD, compact CV, writing style guide and evaluation report's customization plan into the literal CV worksheet prompt, validates the JSON answer, maps it onto the canonical catalog from `config/cv.md` and renders it through `src/cvgen/templates/cv-structured.html` and `src/cvgen/generate-pdf.mjs`.
 
 ## Run
-`node src/cvgen/draft-cv.mjs --job=ID [--provider=claude|codex] [--dry-run] [--prepare-only]` (also `npm run draft:cv`)
+`node src/cvgen/draft-cv.mjs --job=ID [--provider=claude|codex] [--model=ID] [--dry-run] [--prepare-only]` (also `npm run draft:cv`)
 - `--job=ID`: permanent job ID; resolves report, JD and output folder from PostgreSQL. Alternative: `--jd=path --report=path --out=output/company/role` (`--without-report` skips the report requirement and needs prior user authorization).
 - CV only. The cover letter is always a separate call through `src/cvgen/draft-cover-letter.mjs`; the retired `--cover-letter` and `--letter-only` flags are rejected with an error naming that launcher.
-- `--provider`: `claude` or `codex` (default from `config/cv-drafting.json`). `--dry-run`: print provider, prompt path, run directory and selection; no files. `--prepare-only`: write the run folder with the rendered context but make no CLI call. `--init`: create `<drafting_root>/runs`. `--doctor`: login status for both providers. `--smoke`: rejected.
+- `--provider`: `claude` or `codex` (default from `config/cv-drafting.json`). `--model=ID`: model for this run only (at most 80 characters, no control characters); absent keeps `<provider>_model` from the config. The browser dashboard passes its saved selection through these flags. `--dry-run`: print provider, prompt path, run directory and selection; no files. `--prepare-only`: write the run folder with the rendered context but make no CLI call. `--init`: create `<drafting_root>/runs`. `--doctor`: login status for both providers. `--smoke`: rejected.
 
 ## Reads
 - `config/cv-drafting.json` (`default_provider`, `claude_command`, `codex_command`, `claude_model`, `codex_model`, `claude_effort`, `timeout_ms`, `drafting_root`, `max_repairs` — default 2, range 0–3; `max_pages` — default 2, range 1–4)
@@ -32,7 +32,7 @@
 - `src/lib/root.mjs`; spawns `src/cvgen/generate-pdf.mjs`
 
 ## Used by
-- `dashboard/workflow.go` (action `cv`, and the `cv` half of `both`; always `--job=N`), `dashboard/workflow_test.go`
+- `src/server/runs.mjs` (browser action `cv`; always `--job=N`)
 - `package.json` (`draft:cv`), `src/test-all.mjs` (existence check), `AGENTS.md` CV/cover-letter exception
 
 ## Counterpart prompt(s)
@@ -58,3 +58,4 @@
 - `validateAnswer` reports every detectable issue with a JSON path, a validation repair returns only the failed block, and a JSON repair returns the same object it was given (worksheet or block). The run fails only once the budget is spent, with the last failure's message — a CV that cannot be brought within `max_pages` inside the budget fails the run rather than shipping over length.
 - Page count comes from `generate-pdf.mjs`'s `📊 Pages: N` stdout line (an approximate PDF-structure count, parsed with a regex — no PDF-page-count tool is invoked separately); rendering happens once per attempt, inside the same retry loop as worksheet validation, so `rendered/worksheet-response.json`, `.html` and `.pdf` reflect whichever attempt is currently running.
 - Success prints `rendered-needs-visual-review`; console output and `draft-run.json` record `attempts`, `repairs` (ordered kinds) and `validation_repair_attempted`. Failures write `draft-run.json` with `status: failed` and the same counters, and keep the run folder.
+- Usage accounting (4.7): each worker call passes `processRun` a `usage` option (function `cv`, the configured model, `--job` id when given). Recording is best effort and never fails the run.

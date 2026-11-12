@@ -10,3 +10,6 @@ add forwarded headers. Vite file serving is strict and limited to the `web/` roo
 `node_modules/` directory required for installed frontend dependencies. The repository path comes
 from `src/lib/root.mjs`; the repository root and private directories are not served as Vite file
 roots. Vite's built-in deny list remains enabled. `npm run web:dev` starts it.
+
+The build also defines `__BUILD_STAMP__` as the ISO time of the build (`dev` when serving, so no restart
+banner appears in development). The page compares it with `build` from `/session` (package 4.3, F16).

@@ -48,8 +48,8 @@ weighted score from `scoring.md` weights, clamps to 1 to 5, and writes the repor
   validation and trigger repair instead of publishing an evaluation. It always renders as
   `$X - $Y`, `$X - $Y USD` when `band_currency` is USD, or `$X - $Y estimated` when falling
   back to the estimate — never CAD, base-pay/TC wording, or other free text. `role_summary.archetype`,
-  `summary`, `location` become the table rows the dashboard reads (`LoadReportSummary` in
-  `dashboard/internal/data/career.go`). Renaming any of these keys breaks the dashboard preview.
+  `summary`, `location` become the table rows the dashboard reads (read by
+  `src/server/jobs-detail.mjs`). Renaming any of these keys breaks the dashboard preview.
 - Validation tolerances are deliberately looser than the prompt targets (the code comments say
   so): prompt asks for at most 10 requirement rows, exactly five CV changes and 15 to 20
   keywords; the validators accept 12, 5 to 6 and 15 to 22.

@@ -14,5 +14,5 @@ Creates jobs, evaluations, status events, workflow leases, scan history and lega
 
 ## Dependencies and callers
 
-Used by Node and Go database clients. Permanent IDs, canonical statuses, scores and evaluation history belong here; readable files are artifacts. Amend behavior through a new migration, then regenerate `infra/sql/schema.sql`.
+Used by the Node database clients. Permanent IDs, canonical statuses, scores and evaluation history belong here; readable files are artifacts. Amend behavior through a new migration, then regenerate `infra/sql/schema.sql`.
 

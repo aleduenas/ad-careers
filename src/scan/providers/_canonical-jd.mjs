@@ -188,17 +188,17 @@ function greenhouseParts(url) {
   return board && id ? { board, id: id.split('?')[0] } : null;
 }
 
-async function fetchGreenhouse(url, options) {
+async function postingGreenhouse(url, options) {
   const parts = greenhouseParts(url);
   if (!parts) return null;
   const data = await requestJson(
     `https://boards-api.greenhouse.io/v1/boards/${encodeURIComponent(parts.board)}/jobs/${encodeURIComponent(parts.id)}`,
     options,
   );
-  return cleanDescription(data?.content);
+  return posting(data?.content, data?.title, data?.location?.name, data?.company_name);
 }
 
-async function fetchLever(url, options) {
+async function postingLever(url, options) {
   if (!/(^|\.)lever\.co$/i.test(url.hostname)) return null;
   const [board, id] = url.pathname.split('/').filter(Boolean);
   if (!board || !id) return null;
@@ -214,10 +214,15 @@ async function fetchLever(url, options) {
   ]
     .filter(Boolean)
     .join('\n\n');
-  return cleanDescription(sections);
+  return posting(
+    sections,
+    data?.text,
+    data?.categories?.location || (data?.categories?.allLocations || []).join('; '),
+    null,
+  );
 }
 
-async function fetchAshby(url, options) {
+async function postingAshby(url, options) {
   if (url.hostname !== 'jobs.ashbyhq.com') return null;
   const [board, id] = url.pathname.split('/').filter(Boolean);
   if (!board || !id) return null;
@@ -228,10 +233,10 @@ async function fetchAshby(url, options) {
   const job = (data?.jobs || data?.jobPostings || []).find(
     item => item.id === id || item.jobUrl?.split(/[/?#]/).filter(Boolean).pop() === id,
   );
-  return cleanDescription(job?.descriptionHtml || job?.description);
+  return posting(job?.descriptionHtml || job?.description, job?.title, job?.location, null);
 }
 
-async function fetchSmartRecruiters(url, options) {
+async function postingSmartRecruiters(url, options) {
   if (!/(^|\.)smartrecruiters\.com$/i.test(url.hostname)) return null;
   const [company, postingSlug] = url.pathname.split('/').filter(Boolean);
   if (!company || !postingSlug) return null;
@@ -249,10 +254,14 @@ async function fetchSmartRecruiters(url, options) {
       return [section?.text || section?.description || ''].filter(Boolean);
     })
     .join('\n\n');
-  return cleanDescription(content);
+  const place = data?.location;
+  const where = place
+    ? [place.city, place.region, place.country].filter(Boolean).join(', ') || null
+    : null;
+  return posting(content, data?.name, where, data?.company?.name);
 }
 
-async function fetchWorkday(url, options) {
+async function postingWorkday(url, options) {
   if (!/\.myworkdayjobs\.com$/i.test(url.hostname)) return null;
   const parts = url.pathname.split('/').filter(Boolean);
   const jobIndex = parts.indexOf('job');
@@ -264,10 +273,69 @@ async function fetchWorkday(url, options) {
     `${url.origin}/wday/cxs/${encodeURIComponent(tenant)}/${encodeURIComponent(site)}${externalPath}`,
     options,
   );
-  return cleanDescription(data?.jobPostingInfo?.jobDescription);
+  const info = data?.jobPostingInfo;
+  return posting(info?.jobDescription, info?.title, info?.location, null);
+}
+
+// Shared posting shape: the cleaned description plus the ATS's own title, location and company
+// where its JSON carries them (null otherwise). Null when there is no usable description.
+function posting(description, role, location, company) {
+  const text = cleanDescription(description);
+  if (!text) return null;
+  const field = value => (typeof value === 'string' && value.trim() ? value.trim() : null);
+  return { text, role: field(role), location: field(location), company: field(company) };
+}
+
+const ATS_POSTINGS = [
+  ['greenhouse', postingGreenhouse],
+  ['lever', postingLever],
+  ['ashby', postingAshby],
+  ['smartrecruiters', postingSmartRecruiters],
+  ['workday', postingWorkday],
+];
+
+// The ATS fetchers keep their original text-only contract (and function names, which supply the
+// method string).
+async function fetchGreenhouse(url, options) {
+  return (await postingGreenhouse(url, options))?.text ?? null;
+}
+async function fetchLever(url, options) {
+  return (await postingLever(url, options))?.text ?? null;
+}
+async function fetchAshby(url, options) {
+  return (await postingAshby(url, options))?.text ?? null;
+}
+async function fetchSmartRecruiters(url, options) {
+  return (await postingSmartRecruiters(url, options))?.text ?? null;
+}
+async function fetchWorkday(url, options) {
+  return (await postingWorkday(url, options))?.text ?? null;
 }
 
 const ATS_FETCHERS = [fetchGreenhouse, fetchLever, fetchAshby, fetchSmartRecruiters, fetchWorkday];
+
+/**
+ * Read-only accessor for URL intake: the first ATS fetcher that recognizes the URL returns
+ * { text, company, role, location, method }; fields the ATS JSON lacks are null. Null when the
+ * URL is not a known ATS posting or nothing usable came back.
+ */
+export async function fetchAtsJobPosting(applyUrl, { fetchImpl = requestWithTimeout } = {}) {
+  let url;
+  try {
+    url = new URL(applyUrl);
+  } catch {
+    return null;
+  }
+  for (const [method, fetcher] of ATS_POSTINGS) {
+    try {
+      const found = await fetcher(url, { fetchImpl });
+      if (found) return { ...found, method };
+    } catch {
+      // Not this ATS, or its API failed.
+    }
+  }
+  return null;
+}
 
 export async function fetchCanonicalJobDescription(hit, { fetchImpl = requestWithTimeout } = {}) {
   const embedded = extractEmbeddedDescription(hit);

@@ -96,9 +96,9 @@ try {
         $env:DISCORD_BOT_TOKEN = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($tokenPointer)
         $env:DISCORD_STATE_DIR = $stateDir
     }
-    # The lead runs on Fable 5.1 (user decision, 2026-11-09, D036); specialists stay on Sonnet in
+    # The lead runs on Fable 5.2 (user decision, 2026-11-12, D083); specialists stay on Sonnet in
     # their profiles. To move the lead back to Opus, change this model and .claude/agents/lead-architect.md.
-    $claudeArguments = @('--agent', 'lead-architect', '--model', 'claude-fable-5-1', '--permission-mode', 'auto', '--effort', 'high')
+    $claudeArguments = @('--agent', 'lead-architect', '--model', 'claude-fable-5-2', '--permission-mode', 'auto', '--effort', 'high')
     if (-not $NoDiscord) { $claudeArguments += @('--channels', "plugin:$pluginId") }
     if ($Resume) { $claudeArguments += '--resume' }
     Push-Location -LiteralPath $repoRoot

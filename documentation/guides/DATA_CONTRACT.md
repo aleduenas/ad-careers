@@ -35,7 +35,7 @@ files are not tracked).
 | `src/` | Backend code and tests |
 | `llm/prompts/` (except the two private style inputs) | Versioned prompt contracts for LLM workers |
 | `infra/` | Migrations, schema snapshot, Docker setup |
-| `dashboard/` | Go TUI source; the built `dashboard.exe` and `dash.lnk` are ignored |
+| `web/` | Browser dashboard source; `web/dist/` is generated and ignored |
 | `config/README.md`, `config/examples/` | Documentation of the private files and starting examples |
 | `documentation/` | Index, guides, per-file pages, history |
 | `AGENTS.md`, `CLAUDE.md`, `.claude/settings.json` | Rules for AI development sessions |

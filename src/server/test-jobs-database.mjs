@@ -4,6 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import pg from 'pg';
 import { root } from '../lib/root.mjs';
+import { createJobsDetail } from './jobs-detail.mjs';
 import { createJobsReader, jobsReadSql } from './jobs-read.mjs';
 
 const url = process.env.TEST_DATABASE_URL;
@@ -478,6 +479,62 @@ try {
   assert(overview.progress.weeklyActivity.some(item => item.count > 0));
   assert(materialCalls.length > 0);
 
+  // Job detail: SELECT-only reads against the same isolated schema.
+  const detailSql = [];
+  const detailReader = createJobsDetail({
+    query: async (sql, args) => {
+      assert.match(sql, /^\s*SELECT\b/i, 'detail SQL must be SELECT-only');
+      detailSql.push(sql);
+      return (await pool.query(sql, args)).rows;
+    },
+    rootDir: join(root, 'synthetic-root-that-is-never-read'),
+  });
+  const evaluatedDetail = await detailReader.detail('102');
+  assert.equal(evaluatedDetail.job.company, 'Evaluated Co');
+  assert.equal(evaluatedDetail.job.notes, '');
+  assert.equal(evaluatedDetail.job.evaluationError, false);
+  assert.deepEqual(
+    {
+      text: evaluatedDetail.jd.text,
+      hash: evaluatedDetail.jd.contentHash,
+      revision: evaluatedDetail.jd.revision,
+    },
+    { text: 'Synthetic description', hash: 'synthetic-hash', revision: '1' },
+  );
+  assert(
+    !JSON.stringify(evaluatedDetail).includes('jds/synthetic.md'),
+    'JD file path stays private',
+  );
+  assert(
+    !JSON.stringify(evaluatedDetail).includes('reports/synthetic.md'),
+    'report path stays private',
+  );
+  assert.equal(evaluatedDetail.evaluation.history.length, 1);
+  assert.equal(evaluatedDetail.evaluation.history[0].score, 3.9);
+  assert.equal(evaluatedDetail.evaluation.report.state, 'missing');
+  assert.deepEqual(evaluatedDetail.materials, { match: 'none', ambiguous: false, items: [] });
+  const bigDetail = await detailReader.detail(large.id);
+  assert.equal(bigDetail.job.id, large.id);
+  assert.equal(bigDetail.job.revision, large.revision);
+  assert.equal(bigDetail.history.length, 3, 'all status events for the job are returned');
+  const eventIds = bigDetail.history.map(item => BigInt(item.id));
+  assert.deepEqual(
+    eventIds,
+    [...eventIds].sort((a, b) => (a < b ? -1 : 1)),
+  );
+  assert(
+    bigDetail.history.some(item => item.occurredAt === null),
+    'inferred history keeps a null occurrence time',
+  );
+  const discardedDetail = await detailReader.detail('106');
+  assert.equal(discardedDetail.job.discardReason, 'Latest discard reason');
+  await assert.rejects(detailReader.detail('999999'), error => error.statusCode === 404);
+  await assert.rejects(
+    detailReader.detail('9223372036854775808'),
+    error => error.statusCode === 404,
+  );
+  assert(detailSql.length >= 8);
+
   const after = await snapshot(admin);
   assert.equal(
     after,
@@ -485,7 +542,7 @@ try {
     'read calls leave jobs, status events, evaluations, and JD rows unchanged',
   );
   console.log(
-    'PostgreSQL jobs read integration passed: isolated SELECT, status/date/search/order/cursor projections, salary precision, overview formulas and no-write snapshots',
+    'PostgreSQL jobs read integration passed: isolated SELECT, status/date/search/order/cursor projections, salary precision, overview formulas, job detail reads and no-write snapshots',
   );
 } finally {
   await pool?.end();

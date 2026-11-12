@@ -7,7 +7,7 @@
 `echo '{"url":"...","company":"...","role":"...","text":"...","force":false}' | node src/scan/add-pasted-jd.mjs`
 - No flags. Input is JSON on stdin; output is one line `Added #<id> — <company> — <role> (...)` on success, or an error message and exit code 1.
 - Validation: URL is normalized (control characters and wrapping quotes/brackets stripped, `https://` prepended when no scheme) and must be http(s); company and role are required; trimmed text must be at least 100 characters.
-- Dedup: the dashboard's paste form checks PostgreSQL itself before this script ever runs (`dashboard/internal/data/database.go`'s `CheckURLTracked`) and lets the user confirm past a `scan_history`-only sighting, so this script's own check is a safety net for direct/CLI invocation. A URL already in `jobs` (matched by `url_key`) always fails, since `createJob` would otherwise silently resync that job's JD onto a new paste — this is never bypassable. A URL only seen in `scan_history` (`loadSeenUrls`) fails unless `force` is true.
+- Dedup: the dashboard's paste form checks PostgreSQL itself before this script ever runs (`src/server/intake.mjs`) and lets the user confirm past a `scan_history`-only sighting, so this script's own check is a safety net for direct/CLI invocation. A URL already in `jobs` (matched by `url_key`) always fails, since `createJob` would otherwise silently resync that job's JD onto a new paste — this is never bypassable. A URL only seen in `scan_history` (`loadSeenUrls`) fails unless `force` is true.
 - `main()` only runs when invoked directly.
 
 ## Reads
@@ -23,7 +23,7 @@
 - `../lib/_database.mjs` (`createJob`, `query`, `urlKey`), `../lib/root.mjs` (`root`), `./scan.mjs` (`slugify`, `jdStoragePath`, `loadSeenUrls`, `appendToScanHistory`).
 
 ## Used by
-- `dashboard/workflow.go` `runJDSubmit` (JD submit action): marshals the intake fields (including `force`) to JSON, pipes them on stdin, logs stdout+stderr to `logs/dashboard/paste-jd-*.log`. The dashboard's own `checkJDURL`/`CheckURLTracked` runs first, at the paste form's URL step, so `force` is normally only ever true after the user has confirmed a `scan_history`-only match.
+- `src/server/intake.mjs` and `src/server/runs.mjs` (JD submit action): marshal the intake fields (including `force`) to JSON, pipes them on stdin, log stdout+stderr under `logs/dashboard/`. The dashboard's own link check (`src/server/intake.mjs`) runs first, at the paste form's URL step, so `force` is normally only ever true after the user has confirmed a `scan_history`-only match.
 - `src/scan/test-pasted-jd.mjs` (imports `rawJDDocument`).
 
 ## Notes

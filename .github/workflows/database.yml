@@ -1,4 +1,4 @@
-name: PostgreSQL and dashboard
+name: PostgreSQL and server
 on: [push, pull_request]
 jobs:
   test:
@@ -8,10 +8,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - uses: actions/setup-go@v5
-        with:
-          go-version-file: dashboard/go.mod
-          cache-dependency-path: dashboard/go.sum
       - run: npm ci
       - run: node src/helpers/db-schema.mjs --check
       - run: node src/helpers/db-infra.mjs init

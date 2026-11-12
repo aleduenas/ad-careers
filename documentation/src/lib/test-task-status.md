@@ -10,4 +10,4 @@ Unit tests for worker task reporting.
 
 ## Inputs, dependencies and side effects
 
-Writes a task record and stand-in worker scripts in a temporary directory, then runs them with `CAREER_TASK_FILE` set. Covers the no-op path without a task file, phase and retry updates that preserve the dashboard-written fields, and terminal state for both a clean exit and a crash. No database, network or subscription CLI.
+Writes a task record and stand-in worker scripts in a temporary directory, then runs them with `CAREER_TASK_FILE` set. Covers the no-op path without a task file, phase and retry updates that preserve the dashboard-written fields, and terminal state for both a clean exit and a crash. It also checks the run-aware reporter with an injected query (report and finish SQL, invalid run id disabled, errors swallowed, hung call bounded) and that a worker with `CAREER_RUN_ID` and an unreachable database (`DATABASE_URL` pointed at a closed local port) still completes normally. No database, network or subscription CLI.

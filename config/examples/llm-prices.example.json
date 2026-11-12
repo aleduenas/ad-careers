@@ -1,0 +1,109 @@
+{
+  "version": 1,
+  "prices": [
+    {
+      "provider": "claude",
+      "model": "sonnet",
+      "inputUsdPerMtok": 2,
+      "cachedInputUsdPerMtok": 0.1,
+      "cacheWriteUsdPerMtok": 4,
+      "outputUsdPerMtok": 10,
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing, fetched 2026-11-12; Claude Sonnet 5.5; 1-hour cache write rate (2x input; the Claude CLI writes 1-hour caches); the alias is taken as the latest Sonnet"
+    },
+    {
+      "provider": "claude",
+      "model": "opus",
+      "inputUsdPerMtok": 4,
+      "cachedInputUsdPerMtok": 0.2,
+      "cacheWriteUsdPerMtok": 8,
+      "outputUsdPerMtok": 20,
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing, fetched 2026-11-12; Claude Opus 5.5; 1-hour cache write rate (2x input; the Claude CLI writes 1-hour caches); the alias is taken as the latest Opus"
+    },
+    {
+      "provider": "claude",
+      "model": "haiku",
+      "inputUsdPerMtok": 0.1,
+      "cachedInputUsdPerMtok": 0.01,
+      "cacheWriteUsdPerMtok": 0.2,
+      "outputUsdPerMtok": 0.5,
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing, fetched 2026-11-12; Claude Haiku 5.5; base prices are for prompts up to 100,000 tokens, longContext is the over-100,000 tier; 1-hour cache write rate (2x input; the Claude CLI writes 1-hour caches); the alias is taken as the latest Haiku",
+      "longContext": {
+        "promptTokensOver": 100000,
+        "inputUsdPerMtok": 0.5,
+        "cachedInputUsdPerMtok": 0.05,
+        "cacheWriteUsdPerMtok": 1,
+        "outputUsdPerMtok": 2.5
+      }
+    },
+    {
+      "provider": "claude",
+      "model": "claude-sonnet-5-5",
+      "inputUsdPerMtok": 2,
+      "cachedInputUsdPerMtok": 0.1,
+      "cacheWriteUsdPerMtok": 4,
+      "outputUsdPerMtok": 10,
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing, fetched 2026-11-12; Claude Sonnet 5.5; 1-hour cache write rate (2x input; the Claude CLI writes 1-hour caches)"
+    },
+    {
+      "provider": "claude",
+      "model": "claude-opus-5-5",
+      "inputUsdPerMtok": 4,
+      "cachedInputUsdPerMtok": 0.2,
+      "cacheWriteUsdPerMtok": 8,
+      "outputUsdPerMtok": 20,
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing, fetched 2026-11-12; Claude Opus 5.5; 1-hour cache write rate (2x input; the Claude CLI writes 1-hour caches)"
+    },
+    {
+      "provider": "claude",
+      "model": "claude-haiku-5-5",
+      "inputUsdPerMtok": 0.1,
+      "cachedInputUsdPerMtok": 0.01,
+      "cacheWriteUsdPerMtok": 0.2,
+      "outputUsdPerMtok": 0.5,
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing, fetched 2026-11-12; Claude Haiku 5.5; base prices are for prompts up to 100,000 tokens, longContext is the over-100,000 tier; 1-hour cache write rate (2x input; the Claude CLI writes 1-hour caches)",
+      "longContext": {
+        "promptTokensOver": 100000,
+        "inputUsdPerMtok": 0.5,
+        "cachedInputUsdPerMtok": 0.05,
+        "cacheWriteUsdPerMtok": 1,
+        "outputUsdPerMtok": 2.5
+      }
+    },
+    {
+      "provider": "claude",
+      "model": "claude-haiku-4-5",
+      "inputUsdPerMtok": 1,
+      "cachedInputUsdPerMtok": 0.1,
+      "cacheWriteUsdPerMtok": 2,
+      "outputUsdPerMtok": 5,
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing, fetched 2026-11-12; Claude Haiku 4.5 (dated ids such as claude-haiku-4-5-20251001 match by prefix); 1-hour cache write rate (2x input; the Claude CLI writes 1-hour caches)"
+    },
+    {
+      "provider": "claude",
+      "model": "claude-sonnet-5",
+      "inputUsdPerMtok": 2,
+      "cachedInputUsdPerMtok": 0.2,
+      "cacheWriteUsdPerMtok": 4,
+      "outputUsdPerMtok": 10,
+      "source": "https://platform.claude.com/docs/en/about-claude/pricing, fetched 2026-11-12; Claude Sonnet 5; 1-hour cache write rate (2x input; the Claude CLI writes 1-hour caches)"
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-6.1-sol",
+      "inputUsdPerMtok": 2,
+      "cachedInputUsdPerMtok": 0.1,
+      "cacheWriteUsdPerMtok": 2.5,
+      "outputUsdPerMtok": 10,
+      "source": "https://developers.openai.com/api/docs/pricing, fetched 2026-11-12; cache write is the 30-minute rate"
+    },
+    {
+      "provider": "codex",
+      "model": "gpt-6-luna",
+      "inputUsdPerMtok": 0.1,
+      "cachedInputUsdPerMtok": 0.01,
+      "cacheWriteUsdPerMtok": 0.125,
+      "outputUsdPerMtok": 0.5,
+      "source": "https://developers.openai.com/api/docs/pricing, fetched 2026-11-12; cache write is the 30-minute rate"
+    }
+  ]
+}

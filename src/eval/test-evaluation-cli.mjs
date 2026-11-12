@@ -160,6 +160,30 @@ try {
     /Ambiguous cached JD/,
     'multiple URL matches must not be guessed',
   );
+  // Launcher flags added for the browser dashboard: parsing and validation only, before any
+  // database, prompt or provider work, so every case exits immediately.
+  {
+    const launcher = join(dirname(fileURLToPath(import.meta.url)), 'evaluate-jobs.mjs');
+    const run = (...args) =>
+      spawnSync(process.execPath, [launcher, ...args], { encoding: 'utf8', timeout: 30000 });
+    const help = run('--help');
+    assert.equal(help.status, 0);
+    for (const flag of ['--model=ID', '--research-provider=claude|codex', '--research-model=ID'])
+      assert.ok(help.stdout.includes(flag), 'usage lists ' + flag);
+    for (const [args, message] of [
+      [['--job=1', '--model'], /--model needs a model id/],
+      [['--job=1', '--model='], /--model needs a model id/],
+      [['--job=1', '--model=' + 'x'.repeat(81)], /--model needs a model id/],
+      [['--job=1', '--research-model='], /--research-model needs a model id/],
+      [['--job=1', '--research-provider=gemini'], /Research provider must be claude or codex/],
+      [['--job=1', '--provider=gemini'], /Provider must be claude or codex/],
+      [['--job=1', '--bogus=1'], /Unknown option: bogus/],
+    ]) {
+      const result = run(...args);
+      assert.notEqual(result.status, 0, args.join(' '));
+      assert.match(result.stderr, message, args.join(' '));
+    }
+  }
   if (!process.env.TEST_DATABASE_URL) {
     console.log(
       'Evaluation validation tests passed; SKIPPED launcher integration without TEST_DATABASE_URL',
@@ -340,6 +364,17 @@ cp.spawn=function(command,args,options){
       );
     }
     assert.equal(Number((await q('SELECT count(*) FROM evaluations')).at(0).count), 3);
+    // Regression (4.7): the accounting rows carry the numeric job directory as job_id, and none
+    // for company research (its directory is not numeric).
+    const accounted = await q(
+      'SELECT function, count(*)::int AS n, count(job_id)::int AS with_job FROM llm_calls GROUP BY function',
+    );
+    const byFn = Object.fromEntries(accounted.map(r => [r.function, r]));
+    for (const fn of ['gate', 'market', 'evaluation']) {
+      assert.ok(byFn[fn]?.n > 0, fn + ' calls are recorded');
+      assert.equal(byFn[fn].with_job, byFn[fn].n, fn + ' rows carry the job id');
+    }
+    assert.ok(!byFn.companyResearch || byFn.companyResearch.with_job === 0);
     const firstEvalCount = calls().filter(c => c.prompt.startsWith('Evaluate the supplied')).length;
     put('allow-retry', 'yes');
     run(['--resume=' + id], 2);
@@ -378,6 +413,19 @@ cp.spawn=function(command,args,options){
       'manual intake still receives scored evaluation',
     );
     assert.equal((await q('SELECT status FROM jobs WHERE id=8'))[0].status, 'Evaluated');
+    // D070: an explicit id re-evaluates an Evaluated job (new history row and report, status
+    // unchanged); the unselected and by-name paths stay Pending-only.
+    const priorReport = (await q('SELECT report_path FROM jobs WHERE id=8'))[0].report_path;
+    run(['--job=8']);
+    assert.equal(
+      Number((await q('SELECT count(*) FROM evaluations WHERE job_id=8')).at(0).count),
+      2,
+      'a re-evaluation adds a history row',
+    );
+    const reeval = (await q('SELECT status,report_path FROM jobs WHERE id=8'))[0];
+    assert.equal(reeval.status, 'Evaluated');
+    assert.notEqual(reeval.report_path, priorReport);
+    assert.ok(reeval.report_path.startsWith('data/evaluations/8-'));
     // New cache-missing company exercises one shared research request across roles.
     for (const [id, role] of [
       [6, 'Engineer'],

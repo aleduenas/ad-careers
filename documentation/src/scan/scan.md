@@ -7,7 +7,7 @@
 `node src/scan/scan.mjs [--dry-run] [--company <name> | --company=<name>] [--report-json <path> | --report-json=<path>]`
 - `--dry-run`: discover and filter, print the summary, but write no JD files, no PostgreSQL rows and no provider caches (`ctx.dryRun = true`). Only a requested coverage report is still written.
 - `--company X`: case-insensitive substring match on the entry `name`; only matching entries are scanned.
-- `--report-json <path>`: write a coverage report (`schema_version: 1`, per-company classification/provider/status/jobs_found/reason, enabled `search_queries`). Parent directory is created.
+- `--report-json <path>`: write a coverage report (`schema_version: 1`, per-company classification/provider/status/jobs_found/reason, enabled `search_queries`). The summary also carries `missing_full_jd` (the count printed as `Missing full JD`) and the report has a top-level `missing` list of `{company, title, url}` for those deferred postings (at most 500 entries, in discovery order); the browser dashboard reads both through `GET /api/v1/runs/:id/scan-report`. Parent directory is created.
 - `main()` only runs when the file is the entry script, so importing it is side-effect free apart from `mkdirSync('data')`.
 - Alias: `npm run scan`. Concurrency across companies is fixed at 10.
 
@@ -27,7 +27,7 @@
 - `./providers/_http.mjs` (`makeHttpCtx`, `htmlToText`), `./location-gate-core.mjs` (`gate`), `../lib/_database.mjs` (`query`, `createJob`, `urlKey`), `js-yaml`.
 
 ## Used by
-- `dashboard/main.go` scan action (`PipelineRunScanMsg` runs `node src/scan/scan.mjs` in the repo root).
+- `src/server/runs.mjs` (the browser scan action runs `node src/scan/scan.mjs` in the repo root).
 - `src/scan/add-pasted-jd.mjs` (imports `slugify`, `jdStoragePath`, `loadSeenUrls`, `appendToScanHistory`).
 - `src/helpers/verify-portals.mjs` (imports `loadProviders`, `resolveProvider`).
 - `src/scan/test-scan-coverage.mjs`; `package.json` `scan` script; listed as a required system file in `src/test-all.mjs`.

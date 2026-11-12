@@ -4,21 +4,20 @@
  * test-all.mjs — Comprehensive test suite for career-ops
  *
  * Run before merging any PR or pushing changes.
- * Tests: syntax, scripts, dashboard, data contract, paths.
+ * Tests: syntax, scripts, web toolchain, data contract, paths.
  *
  * All script-execution checks run in --dry-run mode — this suite NEVER
  * modifies user data (the personal database or private artifacts).
  *
  * Usage:
  *   node src/test-all.mjs           # Run all tests
- *   node src/test-all.mjs --quick   # Skip dashboard build (faster)
+ *   node src/test-all.mjs --quick   # Skip the web production build (faster)
  */
 
 import { execFileSync } from 'child_process';
 import { readFileSync, existsSync, readdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
-import { tmpdir } from 'os';
 
 const SRC_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT = dirname(SRC_DIR);
@@ -174,25 +173,9 @@ if (QUICK) {
   else fail('Web production build failed');
 }
 
-if (!QUICK) {
-  console.log('\n4. Dashboard build');
-  const out = join(tmpdir(), 'career-dashboard-test.exe');
-  const goBuild = run('go', ['build', '-o', out, '.'], {
-    cwd: join(ROOT, 'dashboard'),
-    diagnostics: true,
-  });
-  if (goBuild !== null) {
-    pass('Dashboard compiles');
-  } else {
-    fail('Dashboard build failed');
-  }
-} else {
-  console.log('\n4. Dashboard build (skipped --quick)');
-}
+// ── 4. DATA CONTRACT ────────────────────────────────────────────
 
-// ── 5. DATA CONTRACT ────────────────────────────────────────────
-
-console.log('\n5. Data contract validation');
+console.log('\n4. Data contract validation');
 
 // Check system files exist
 const systemFiles = [
@@ -260,9 +243,9 @@ for (const f of userFiles) {
   }
 }
 
-// ── 6. ABSOLUTE PATH CHECK ──────────────────────────────────────
+// ── 5. ABSOLUTE PATH CHECK ──────────────────────────────────────
 
-console.log('\n6. Absolute path check');
+console.log('\n5. Absolute path check');
 
 const absAllowed = ['README.md', 'LICENSE', 'CLAUDE.md', 'src/test-all.mjs'];
 const absPatterns = ['/Users/', 'C:\\\\Users\\\\'];
@@ -282,7 +265,6 @@ for (const pattern of absPatterns) {
     '*.css',
     '*.html',
     '*.md',
-    '*.go',
     '*.yml',
   ]);
   if (result) {
@@ -298,13 +280,12 @@ if (!absFound) {
   pass('No absolute paths in code files');
 }
 
-// ── 7. DOCUMENTATION COVERAGE ──────────────────────────────────
+// ── 6. DOCUMENTATION COVERAGE ──────────────────────────────────
 
-console.log('\n7. Documentation coverage');
+console.log('\n6. Documentation coverage');
 const documentedRoots = [
   'src',
   'web',
-  'dashboard',
   'infra',
   'llm/prompts',
   'config/examples',
@@ -324,7 +305,7 @@ function documentationSources(dir) {
       return ignoredDirs.has(entry.name) ? [] : documentationSources(path);
     }
     return !privatePromptInputs.has(path) &&
-      (/\.(mjs|go|ps1|sql|yml|json|html|md|woff2|js|jsx|ts|tsx|css)$/.test(path) ||
+      (/\.(mjs|ps1|sql|yml|json|html|md|woff2|js|jsx|ts|tsx|css)$/.test(path) ||
         path === 'infra/docker/.env.example')
       ? [path]
       : [];
@@ -340,9 +321,9 @@ if (!missingPages.length)
     `Documentation pages exist for ${documentationSourcesList.length} source/configuration files`,
   );
 
-// ── 8. AGENTS.md INTEGRITY ──────────────────────────────────────
+// ── 7. AGENTS.md INTEGRITY ──────────────────────────────────────
 
-console.log('\n8. AGENTS.md integrity');
+console.log('\n7. AGENTS.md integrity');
 
 const agents = readFile('AGENTS.md');
 const requiredSections = [
@@ -364,9 +345,9 @@ for (const section of requiredSections) {
   }
 }
 
-// ── 9. VERSION ──────────────────────────────────────────────────
+// ── 8. VERSION ──────────────────────────────────────────────────
 
-console.log('\n9. Version');
+console.log('\n8. Version');
 
 const pkg = JSON.parse(readFile('package.json'));
 if (/^\d+\.\d+\.\d+$/.test(pkg.version || '')) {

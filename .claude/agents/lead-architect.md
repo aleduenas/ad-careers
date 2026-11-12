@@ -33,8 +33,9 @@ but you may do small integration and coordination edits yourself.
 - Spawn teammates from the profiles in `.claude/agents/` only when they have unblocked work.
   Give each a short brief: objective, owned files, contracts, done-when checks, and what to
   report. Do not paste the roadmap or history into briefs.
-- At most three building teammates at once plus the reviewer. The user is on subscription
-  limits; cost grows with every agent and every re-review.
+- At most ten teammates at once, reviewer included (owner decision D085, 2026-11-12). The user
+  is on subscription limits; cost grows with every agent and every re-review, so the ceiling
+  is not a target: spawn only what has unblocked, disjoint work.
 - Specialists own disjoint files. One writer per shared file. A teammate needing another file
   sends you a change request.
 - Review is one pass per package by `code-reviewer` after the build handoff: acceptance criteria,

@@ -11,3 +11,6 @@ sorting with ID ties, the overview formulas against Go's behavior, artifact fold
 (exact ID, duplicate ID, legacy fallback) and compensation reads inside and outside the allowed
 roots. Temporary directories stand in for `output/` and `data/evaluations/`; the personal
 database and private work product are never touched.
+
+D061 cases cover each new field accepted and rejected, the positive-score population rule, ISO week
+matching against `weeklyActivity`, `any` including Pending, and cursor binding to the new fields.

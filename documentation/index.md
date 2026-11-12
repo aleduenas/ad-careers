@@ -1,7 +1,7 @@
 # career-ops documentation
 
 Everything written about how this repository works. The layout it documents is defined in
-[guides/layout.md](guides/layout.md); read that first. Per-file pages cover the backend, prompts, dashboard, infrastructure and configuration.
+[guides/layout.md](guides/layout.md); read that first. Per-file pages cover the backend, prompts, the browser dashboard, infrastructure and configuration.
 The [file reference](reference.md) links every page; `src/test-all.mjs` checks source coverage.
 
 Convention: a document says at the top which file or table is the *authority* for the
@@ -22,7 +22,7 @@ behaviour it describes, so documentation never competes with the thing it docume
 
 | Document | What it covers |
 |---|---|
-| [../dashboard/README.md](../dashboard/README.md) | The Go TUI: launching, actions, logs, rebuild rule |
+| [web/index.md](web/index.md) | The browser dashboard: start, stop and the always-on service are in [guides/SCRIPTS.md](guides/SCRIPTS.md) |
 | [guides/database.md](guides/database.md) | PostgreSQL schema, migrations, statuses, backup and restore, legacy recovery |
 | [guides/prompts.md](guides/prompts.md) | The prompt contracts under `llm/prompts/` |
 | [../llm/prompts/eval/INDEX.md](../llm/prompts/eval/INDEX.md) | Every input substituted into the evaluation prompts |

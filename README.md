@@ -20,12 +20,12 @@ the rules the code follows are in
 | Cover letter | `src/cvgen/draft-cover-letter.mjs` | An editable `cover-letter.md` in the same folder, drafted by its own call |
 | CV + cover letter | both of the above | Two separate background tasks, never one combined call |
 | Publish letter | `src/cvgen/publish-cover-letter.mjs` | The edited letter as a PDF |
-| Status changes, viewing | Go TUI in `dashboard/` | Revision-checked status transitions; reports, CVs, letters and interview prep opened from the pipeline |
+| Status changes, viewing | Browser dashboard (`web/`) | Revision-checked status transitions; reports, CVs, letters and interview prep opened from the pipeline |
 
 ## Requirements
 
-- Windows 11 (the dashboard launcher and Docker setup script target Windows; the Node and Go code are portable)
-- Node.js 24, Go 1.25 or newer (see `dashboard/go.mod`), Docker Desktop
+- Windows 11 (the dashboard launcher and Docker setup script target Windows; the Node code is portable)
+- Node.js 24, Docker Desktop
 - A Claude Code (`claude`) and/or Codex (`codex`) CLI with a subscription login
 
 ## Quick start
@@ -39,9 +39,17 @@ npm run db:migrate                       # applies infra/sql/migrations/
 cp config/examples/profile.example.yml config/profile.yml
 cp config/examples/portals.example.yml config/portals.yml
 # then write config/cv.md, config/profile.md and the compact twins under llm/compacted/
-cd dashboard && go build -o dashboard.exe . && cd ..
-dashboard/launch-dashboard.ps1
+npm run web:start                        # the browser dashboard at http://localhost:4310
 ```
+
+### Browser dashboard (always on)
+
+Run `npm run web:install` once. The dashboard then starts at every Windows logon, with no
+administrator rights and no window, and comes back within a minute if it crashes. Bookmark
+`http://localhost:4310`. After `npm run web:build`, run `npm run web:restart` to serve the new
+build. `npm run web:status` shows what is running; `npm run web:down` and `npm run web:uninstall`
+stop it and remove the logon entry. If PostgreSQL is not up yet at logon, the service waits for it
+(up to five minutes). Log: `logs/dashboard/server.log`.
 
 The step-by-step version, including which private files must exist before each action works, is
 [`documentation/guides/SETUP.md`](documentation/guides/SETUP.md).
@@ -52,7 +60,7 @@ The step-by-step version, including which private files must exist before each a
 src/            backend: lib/ helpers/ cvgen/ eval/ scan/ analytics/ test-all.mjs
 llm/            prompts the LLM workers read; compacted/ (private) token-cheap candidate inputs
 infra/          sql/ migrations + schema snapshot; docker/ compose and setup
-dashboard/      Go TUI and the built dashboard.exe
+web/            browser dashboard (React/Vite); src/server/ is its local API
 config/         (private) candidate documents and runtime settings; examples/ tracked
 data/           (private) jds/ evaluations/ company-info/ interview-prep/ writing-samples/ archive/ backups/
 output/         (private) generated CVs and letters per company/role
@@ -63,8 +71,8 @@ documentation/  index, guides, one page per source file, history
 ## Everyday commands
 
 ```bash
-npm test                                 # full suite incl. dashboard build; --quick via node src/test-all.mjs --quick
-node src/helpers/db-test.mjs             # isolated PostgreSQL + launcher + Go integration tests
+npm test                                 # full suite incl. web build; --quick via node src/test-all.mjs --quick
+node src/helpers/db-test.mjs             # isolated PostgreSQL + launcher integration tests
 npm run db:backup                        # custom-format dump into data/backups/
 node src/helpers/verify-pipeline.mjs     # every stored report/JD path resolves
 node src/helpers/prune-logs.mjs          # retention policy, dry-run by default

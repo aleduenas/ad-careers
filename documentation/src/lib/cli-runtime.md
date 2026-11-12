@@ -17,6 +17,7 @@ Not runnable; imported by other modules.
 
 ## Imports
 - `src/lib/_prompt-templates.mjs` (`renderPrompt`)
+- `src/lib/_llm-usage.mjs` (`recordCallSafe`)
 - `src/lib/root.mjs` (prompt root)
 
 ## Used by
@@ -33,3 +34,22 @@ Not runnable; imported by other modules.
 - `checkLogin` requires Claude `authMethod === 'claude.ai'` or Codex output containing "using ChatGPT"; otherwise it throws with instructions to log in.
 
 On timeout the process tree is killed, then the promise rejects on the child close event. Waiting for closure releases Windows handles before temporary worker cleanup.
+
+## Windows command resolution (F21, D071)
+Node refuses to start `.cmd` or `.bat` files without a shell, and npm global installs such as codex
+are `.cmd` shims. `resolveCommand(name, args)` returns a spawn plan `{ command, args,
+windowsVerbatimArguments, resolved }` and `processRun`, the login checks and the dashboard's
+provider pre-flight all use it, so they agree. On win32 a bare name is searched on `PATH` (any
+casing of the variable) with `PATHEXT`, `.exe` and `.com` before `.cmd` and `.bat`; a name with a
+path separator is used as given. A `.exe` is spawned directly. A `.cmd` or `.bat` runs as
+`cmd.exe /d /s /c "<quoted path> <quoted args>"` with verbatim arguments and `shell: false`. An
+unresolved name is spawned as given, so a missing tool still ends as ENOENT. Other platforms are
+unchanged.
+
+`quoteCmdArgument` wraps each argument in double quotes using the Windows argument rules (a quote
+is escaped, backslashes before it are doubled). It throws for a line break, a NUL or any of
+`%&|<>^`, which cmd.exe would read. Double quotes are escaped rather than rejected because the
+Codex arguments legitimately contain `web_search="live"`.
+
+## Usage recording (4.7)
+`processRun` accepts an optional `usage: { provider, model, fn, jobId, logRef, runId, query }`. When present, after the child closes (and not on timeout) it parses stdout and records one `llm_calls` row through `recordCallSafe`, awaited before the result is returned. The hook never throws: a recording failure is one line on stderr. Without `usage` nothing is recorded, so non-LLM uses (login checks, child scripts) are unaffected. `fn` is one of the labels in `src/lib/_llm-usage.mjs`; `runId` defaults to `CAREER_RUN_ID`; `query` is for tests.

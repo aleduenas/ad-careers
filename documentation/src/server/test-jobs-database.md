@@ -20,7 +20,9 @@ Checks canonical status filtering, large decimal-string IDs and revisions, sourc
 precedence, Toronto status-date conversion and null-event handling, literal Unicode/ID/notes/reason
 search, stable grouping and material promotion, cursor paging/tampering/fingerprint/stale-offset
 handling, manual salary precision and partial salary retention, overview formulas, and safe wire
-projections. A before/after snapshot verifies that jobs, status events, evaluations, and job
+projections. The job detail reader is exercised against the same fixtures (JD without its file path, evaluation
+history, status events in ID order with a null occurrence time, discard reason, bigint IDs,
+unknown IDs). A before/after snapshot verifies that jobs, status events, evaluations, and job
 descriptions are unchanged by reads.
 
 ## Isolation and writes

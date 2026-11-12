@@ -15,7 +15,7 @@ node src/eval/evaluate-jobs.mjs --smoke-research
 node src/eval/evaluate-jobs.mjs --smoke-evaluation
 ```
 
-Selection uses Pending entries and permanent IDs. Cached JDs only; missing JDs
+Selection uses Pending entries (`--next`, `--select`) and permanent IDs. An explicit `--job=ID` also accepts an Evaluated job (D070 re-evaluation): the score and report refresh, a new `evaluations` history row is added, the status stays Evaluated, and the new report is a new immutable file `data/evaluations/<id>-...-<run>.md` that `jobs.report_path` then points to. Any other status is rejected with "No matching Pending or Evaluated job for that id". Cached JDs only; missing JDs
 produce minimal Discarded reports without a model call. Ambiguous location returns
 REVIEW and leaves the job pending. Correct cached evidence and start a new run.
 No submissions or CV generation occur.
@@ -71,7 +71,9 @@ web search. Managed provider policies may still apply. This is context isolation
 not an operating-system filesystem boundary.
 
 Defaults: Claude Sonnet for evaluation, Haiku for research, two concurrent
-processes. `--provider=codex` uses gpt-5.5 for both stages. Optional user-layer
+processes. `--provider=codex` uses gpt-6.1-sol for evaluation and gpt-6-luna for company research. For one run, `--model=ID` overrides the
+evaluation model and `--research-provider=claude|codex` / `--research-model=ID` override the
+research calls (the browser dashboard passes its saved selection this way). Optional user-layer
 `config/evaluation-cli.json` overrides:
 
 ```json
@@ -79,8 +81,8 @@ processes. `--provider=codex` uses gpt-5.5 for both stages. Optional user-layer
   "default_provider": "claude",
   "claude_model": "sonnet",
   "claude_research_model": "haiku",
-  "codex_model": "gpt-5.5",
-  "codex_research_model": "gpt-5.5",
+  "codex_model": "gpt-6.1-sol",
+  "codex_research_model": "gpt-6-luna",
   "max_concurrency": 2,
   "max_repairs": 2,
   "timeout_ms": 600000

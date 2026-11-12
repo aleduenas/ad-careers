@@ -56,6 +56,9 @@ const allowed = [
   'select',
   'next',
   'provider',
+  'model',
+  'research-provider',
+  'research-model',
   'dry-run',
   'prepare-only',
   'resume',
@@ -69,7 +72,7 @@ for (const key of Object.keys(options))
   if (!allowed.includes(key)) throw new Error('Unknown option: ' + key);
 if (options.help || !Object.keys(options).length) {
   console.log(
-    'Usage: node src/eval/evaluate-jobs.mjs --job=123 | --select="company role" | --next=5\nOptions: --provider=claude|codex --dry-run --prepare-only\nResume: --resume=RUN_ID\nDiagnostics: --doctor --smoke',
+    'Usage: node src/eval/evaluate-jobs.mjs --job=123 | --select="company role" | --next=5\nOptions: --provider=claude|codex --model=ID --research-provider=claude|codex --research-model=ID --dry-run --prepare-only\nResume: --resume=RUN_ID\nDiagnostics: --doctor --smoke',
   );
   process.exit(0);
 }
@@ -80,8 +83,8 @@ const config = {
   codex_command: cvConfig.codex_command || 'codex',
   claude_model: 'sonnet',
   claude_research_model: 'haiku',
-  codex_model: 'gpt-5.5',
-  codex_research_model: 'gpt-5.5',
+  codex_model: 'gpt-6.1-sol',
+  codex_research_model: 'gpt-6-luna',
   timeout_ms: 600000,
   max_repairs: 2,
   max_concurrency: 2,
@@ -93,10 +96,31 @@ for (const key of ['timeout_ms', 'max_concurrency'])
   if (!Number.isInteger(config[key]) || config[key] < 1) throw new Error('Invalid ' + key);
 if (!Number.isInteger(config.max_repairs) || config.max_repairs < 0 || config.max_repairs > 3)
   throw new Error('max_repairs must be 0–3');
-if (!config[provider + '_model'] || !config[provider + '_research_model'])
+// --model=<id> overrides the configured model for this run only (browser dashboard dispatch).
+function modelFlag(value, name = 'model') {
+  // eslint-disable-next-line no-control-regex
+  if (
+    typeof value !== 'string' ||
+    !value.trim() ||
+    value.length > 80 ||
+    /[\u0000-\u001f\u007f]/.test(value)
+  )
+    throw new Error('--' + name + ' needs a model id of at most 80 characters');
+  return value.trim();
+}
+// Per-run overrides (browser dashboard dispatch): absent flags keep the configured values.
+if (options.model !== undefined) config[provider + '_model'] = modelFlag(options.model);
+const researchProvider = options['research-provider'] ?? provider;
+if (!['claude', 'codex'].includes(researchProvider))
+  throw new Error('Research provider must be claude or codex');
+const researchModel =
+  options['research-model'] !== undefined
+    ? modelFlag(options['research-model'], 'research-model')
+    : config[researchProvider + '_research_model'];
+if (!config[provider + '_model'] || !researchModel)
   throw new Error('Explicit evaluation and research models required');
 const archive = draftingRoot(root, 'logs/evaluation');
-const researchConfig = { ...config, [provider + '_model']: config[provider + '_research_model'] };
+const researchConfig = { ...config, [researchProvider + '_model']: researchModel };
 async function script(name, args) {
   const r = await processRun(process.execPath, [join(root, 'src', 'eval', name), ...args], {
     cwd: root,
@@ -126,7 +150,7 @@ if (options.smoke || options['smoke-research'] || options['smoke-evaluation']) {
       dir,
       'research-smoke',
       prompt,
-      provider,
+      researchProvider,
       researchConfig,
       true,
       v => {
@@ -212,7 +236,7 @@ if (options.resume) {
   const selected = options.job ? found.jobs.filter(j => j.num === String(options.job)) : found.jobs;
   if (!selected.length)
     throw new Error(
-      'No matching Pending jobs. Use a pending permanent ID or --select="company role".',
+      'No matching Pending or Evaluated job for that id. Use a permanent ID (Pending or Evaluated) or --select="company role" (Pending only).',
     );
   const date = new Date().toISOString().slice(0, 10),
     id = new Date().toISOString().replace(/[:.]/g, '-') + '-' + randomUUID().slice(0, 8);
@@ -240,7 +264,8 @@ if (options.resume) {
           provider,
           models: {
             evaluation: config[provider + '_model'],
-            research: config[provider + '_research_model'],
+            research: researchModel,
+            research_provider: researchProvider,
           },
           jobs: jobs.map(({ jd, ...j }) => j),
           note: 'Company research scheduled only after eligibility PASS; fresh cache skips company CLI.',
@@ -298,7 +323,8 @@ try {
     source_revision: sourceRevision(),
     provider,
     evaluation_model: config[provider + '_model'],
-    research_model: config[provider + '_research_model'],
+    research_model: researchModel,
+    research_provider: researchProvider,
     system_prompt_paths:
       provider === 'claude'
         ? ['llm/prompts/runtime/no-tools.md', 'llm/prompts/runtime/research.md']
@@ -332,6 +358,8 @@ try {
         throw new Error('Cached JD changed; start a new run: ' + j.num);
     if (state.jobs.some(j => j.jd && !state.staged[j.num]))
       await temporaryWorker(root, cwd => checkLogin(provider, config, cwd));
+    if (researchProvider !== provider && state.jobs.some(j => j.jd && !state.staged[j.num]))
+      await temporaryWorker(root, cwd => checkLogin(researchProvider, config, cwd));
     for (const j of state.jobs) releases.push(await lease('evaluation:' + j.num, ownerToken));
     state.status = 'running';
     save();
@@ -353,7 +381,7 @@ try {
                 join(runDir, j.num),
                 'gate',
                 read(join(runDir, j.num, 'gate.prompt.txt')),
-                provider,
+                researchProvider,
                 researchConfig,
                 false,
                 validateGate,
@@ -397,7 +425,7 @@ try {
               before,
               j.date,
             ),
-            provider,
+            researchProvider,
             researchConfig,
             true,
             v => validateResearch(v, RESEARCH_SECTIONS),
@@ -460,7 +488,7 @@ try {
               join(runDir, j.num),
               'market',
               marketPrompt,
-              provider,
+              researchProvider,
               researchConfig,
               true,
               v => validateResearch(v, ['Role market']),

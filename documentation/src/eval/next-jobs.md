@@ -1,7 +1,7 @@
 # src/eval/next-jobs.mjs
 
 **Kind:** launcher
-**Purpose:** Lists Pending jobs from PostgreSQL for a person or for the evaluation launcher. It resolves a permanent ID, a free-text company/role search, or the next N by ID, and prints either one human-readable line per job or a JSON envelope that includes the planned report path.
+**Purpose:** Lists Pending jobs from PostgreSQL for a person or for the evaluation launcher. It resolves a permanent ID (Pending or Evaluated, for re-evaluation; the search and next-N paths stay Pending-only), a free-text company/role search, or the next N by ID, and prints either one human-readable line per job or a JSON envelope that includes the planned report path.
 
 ## Run
 `node src/eval/next-jobs.mjs [N] [--select=term1,term2] [--id=ID] [--json]`

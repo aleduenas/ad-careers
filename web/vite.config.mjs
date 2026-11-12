@@ -6,8 +6,12 @@ import { root as repositoryRoot } from '../src/lib/root.mjs';
 
 const webRoot = fileURLToPath(new URL('.', import.meta.url));
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   root: webRoot,
+  // The page carries the time it was built so it can tell when the running service is older.
+  define: {
+    __BUILD_STAMP__: JSON.stringify(command === 'build' ? new Date().toISOString() : 'dev'),
+  },
   plugins: [react()],
   server: {
     host: '127.0.0.1',
@@ -30,4 +34,4 @@ export default defineConfig({
     outDir: 'dist',
     emptyOutDir: true,
   },
-});
+}));

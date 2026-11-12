@@ -31,6 +31,7 @@ detail (inputs, outputs, callers) is in `documentation/src/`.
 | `node src/helpers/verify-portals.mjs` | Portal configuration diagnostics and provider coverage. `npm run verify:portals` |
 | `node src/helpers/prune-reports.mjs <file...> \| --list` | Retire named report files into `data/evaluations/.trash/` (writes by default; use deliberately) |
 | `node src/helpers/prune-logs.mjs [--apply]` | Retention policy for `logs/` and `data/backups/` (dry-run default) |
+| `node src/helpers/import-llm-usage.mjs [--apply]` | Backfill `llm_calls` token records from `logs/evaluation` and `logs/drafting` (dry-run default; idempotent; also fills a missing `job_id` on already recorded rows, never overwriting one) |
 
 ## Analytics
 
@@ -48,6 +49,13 @@ detail (inputs, outputs, callers) is in `documentation/src/`.
 | `npm run web:build` | Run `web:typecheck` once, then build the frontend into ignored `web/dist/`. Requires `web/index.html` and frontend source. |
 | `npm run web:dev` | Start Vite on strict loopback `127.0.0.1:5173`; `/api` proxies to `127.0.0.1:4310` without forwarded-host headers. Fails if port 5173 is occupied. |
 | `npm run web:start [-- --no-open]` | Preflight and build the production web app, serve only `web/dist` on `127.0.0.1:4310` (or a validated `PORT`), and open `/#/overview`. `--no-open` leaves browser opening to the caller. Ctrl+C closes the owned listener; HTML uses a restrictive same-origin CSP, with API JSON protections unchanged. |
+| `npm run web:start:win` | Foreground server through `src/helpers/Start-Dashboard.ps1` (checks Node, dependencies, database and port with one clear failure each; Ctrl+C stops). Page: `documentation/src/helpers/Start-Dashboard.md`. |
+| `npm run web:up` | Start the always-on background service (hidden supervisor, waits up to 5 minutes for the database, restarts the server within seconds if it dies, logs to `logs/dashboard/server.log`). No-op when already running. Never opens a browser. |
+| `npm run web:down` | Stop the recorded server, foreground or service (the server and its supervisor only; detached workers keep running). Safe to repeat. |
+| `npm run web:restart` | `web:down` then `web:up`, waiting until the port answers. Run it after `npm run web:build`; the page's build stamp then changes. Also takes over a foreground server. |
+| `npm run web:status` | Running or not, mode, pid, port, uptime, URL and whether the logon entry is installed. |
+| `npm run web:install` | Register a current-user Task Scheduler entry that starts the service at Windows logon (no administrator rights), then start it now if needed. |
+| `npm run web:uninstall` | Remove the logon entry; a running server is left alone. |
 
 The root Node toolchain requires Node.js 24 or newer. The harness quick run invokes `web:typecheck` once; the full run requires `web/index.html` and invokes `web:build` once, so typechecking is not repeated.
 
@@ -58,7 +66,7 @@ The root Node toolchain requires Node.js 24 or newer. The harness quick run invo
 | `node src/helpers/db-infra.mjs init \| up \| down \| status \| config \| backup [file] \| restore file career_ops_restore_NAME` | Docker Compose lifecycle and custom-format dumps (`.partial` until complete). `npm run db:up`, `db:down`, `db:backup` |
 | `node src/helpers/db-migrate.mjs` | Apply pending numbered migrations with checksums. `npm run db:migrate` |
 | `node src/helpers/db-schema.mjs [--check]` | Regenerate or verify `infra/sql/schema.sql`. `npm run db:schema` |
-| `node src/helpers/db-test.mjs` | Provision an isolated test database and run the Node + Go integration suites. `npm run db:test` |
+| `node src/helpers/db-test.mjs` | Provision an isolated test database and run the Node integration suites. `npm run db:test` |
 | `node src/helpers/import-legacy.mjs [--apply] [--archive]` | Legacy file-store recovery only (audit by default). `npm run db:audit` |
 | `node src/helpers/db-cutover.mjs` | Historical one-shot cutover orchestration; recovery use only. `npm run db:cutover` |
 
@@ -66,9 +74,8 @@ The root Node toolchain requires Node.js 24 or newer. The harness quick run invo
 
 | Command | What it does |
 |---|---|
-| `node src/test-all.mjs [--quick]` | Syntax/tests under `src/` and maintained web `.mjs`, web strict typecheck in quick mode, web production build in full mode when `web/index.html` exists, retained Go dashboard build in full mode, data-contract, docs and path checks. `npm test` |
+| `node src/test-all.mjs [--quick]` | Syntax/tests under `src/` and maintained web `.mjs`, web strict typecheck in quick mode, web production build in full mode when `web/index.html` exists, data-contract, docs and path checks. `npm test` |
 | `node src/<function>/test-*.mjs` | Any single test. Database-backed tests print `SKIPPED` without `TEST_DATABASE_URL`; use `db-test.mjs` to run them for real |
-| `go test ./...` (from `dashboard/`) | Dashboard unit tests; `TestPostgresDashboardLifecycle` needs `TEST_DATABASE_URL` |
 
 ## Formatting
 
@@ -77,13 +84,6 @@ The root Node toolchain requires Node.js 24 or newer. The harness quick run invo
 | `npx prettier --write <file>` | Format one `.mjs` file to the repo's Prettier style (`.prettierrc.json`) |
 | `node_modules/.bin/prettier --write "src/**/*.mjs"` | Format all of `src`. `npm run format` |
 | `node_modules/.bin/prettier --check "src/**/*.mjs"` | Verify formatting without writing. `npm run format:check` |
-
-## Dashboard
-
-| Command | What it does |
-|---|---|
-| `go build -o dashboard.exe .` (from `dashboard/`) | Build the real binary; required after any dashboard change |
-| `dashboard/launch-dashboard.ps1` | Launch against the repository root (the shortcut target) |
 
 ## Development lead and Discord
 

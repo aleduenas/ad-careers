@@ -5,9 +5,8 @@ says exactly which files must exist before each dashboard action works.
 
 ## 1. Prerequisites
 
-- Windows 11 (launcher and Docker setup script are Windows-specific; Node/Go code is portable)
+- Windows 11 (launcher and Docker setup script are Windows-specific; Node code is portable)
 - Node.js 24 and npm
-- Go 1.25 or newer (`dashboard/go.mod` is the authority)
 - Docker Desktop (PostgreSQL runs in Compose)
 - Claude Code CLI (`claude`) and/or Codex CLI (`codex`) with a **subscription login**
   (`claude auth login` / `codex login`). API keys are deliberately stripped from worker
@@ -58,8 +57,8 @@ same edit (both headers say so). `config/README.md` has the full file list.
 ## 5. Build and launch the dashboard
 
 ```bash
-cd dashboard && go build -o dashboard.exe . && cd ..
-dashboard/launch-dashboard.ps1      # or ./dashboard/dashboard.exe --path .
+npm run web:build
+npm run web:start                   # or npm run web:install for the always-on logon service
 ```
 
 ## 6. Verify

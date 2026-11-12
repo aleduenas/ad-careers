@@ -32,29 +32,55 @@ export function databaseConfig() {
   };
 }
 let pool;
+// A server-side disconnect (a PostgreSQL restart, pg_terminate_backend, a network drop) emits
+// 'error' on the idle or checked-out client and on the pool. With no listener Node would crash the
+// whole process. The failed client is already discarded by the pool, so the next query connects
+// afresh. The loss is logged once per outage, with the error code only: never the message, the
+// connection string or any credential.
+let outageReported = false;
+function onConnectionError(error) {
+  if (outageReported) return;
+  outageReported = true;
+  const code =
+    typeof error?.code === 'string' && /^[0-9A-Za-z_]{1,16}$/.test(error.code)
+      ? error.code
+      : 'unknown';
+  console.error('Database connection lost (' + code + '); the next query reconnects.');
+}
 export function db() {
-  return (pool ??= new pg.Pool({
+  if (pool) return pool;
+  const created = new pg.Pool({
     ...databaseConfig(),
     connectionTimeoutMillis: 5000,
     statement_timeout: 15000,
     allowExitOnIdle: true,
-  }));
+  });
+  created.on('error', onConnectionError);
+  // Also covers clients that are checked out when the connection drops.
+  created.on('connect', client => client.on('error', onConnectionError));
+  return (pool = created);
 }
 export async function query(sql, args = []) {
-  return (await db().query(sql, args)).rows;
+  const rows = (await db().query(sql, args)).rows;
+  outageReported = false;
+  return rows;
 }
 export async function transaction(fn) {
   const client = await db().connect();
+  let broken;
   try {
     await client.query('BEGIN');
     const value = await fn(client);
     await client.query('COMMIT');
     return value;
   } catch (e) {
-    await client.query('ROLLBACK');
+    // A dead connection cannot roll back; keep the original error and drop the client.
+    await client.query('ROLLBACK').catch(rollbackError => {
+      broken = rollbackError;
+    });
     throw e;
   } finally {
-    client.release();
+    client.release(broken);
   }
 }
 export function urlKey(url) {

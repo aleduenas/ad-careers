@@ -419,6 +419,8 @@ async function main() {
   let totalDupes = 0;
   let totalGateFailed = 0;
   let totalMissingContent = 0;
+  // Postings deferred for lack of a full JD, for the report (bounded so a bad portal cannot bloat it).
+  const missingFullJd = [];
   const newOffers = [];
   const errors = [...resolveErrors];
 
@@ -471,6 +473,8 @@ async function main() {
         const substantiveContent = htmlToText(job.content || '').trim();
         if (substantiveContent.length < 300) {
           totalMissingContent++;
+          if (missingFullJd.length < 500)
+            missingFullJd.push({ company: job.company, title: job.title, url: job.url });
           continue;
         }
         job.content = substantiveContent;
@@ -574,7 +578,9 @@ async function main() {
         error: coverage.filter(row => row.status === 'error').length,
         jobs_found: totalFound,
         new_offers: newOffers.length,
+        missing_full_jd: totalMissingContent,
       },
+      missing: missingFullJd,
       companies: coverage,
       search_queries: (config.search_queries || []).filter(query => query.enabled !== false),
     };

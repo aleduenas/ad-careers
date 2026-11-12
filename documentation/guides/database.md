@@ -2,7 +2,7 @@
 
 `infra/sql/migrations/` is the authoritative, ordered SQL history. `infra/sql/schema.sql` is its generated review snapshot. Do not edit applied migrations; add a numbered migration. The runner verifies checksums and takes a database migration lock.
 
-The `jobs` table owns permanent IDs and application status. `evaluations` records immutable completion keys and reports. `job_status_events` records transitions, separating `created_at` (when PostgreSQL recorded the row) from nullable `occurred_at` (when the transition is known to have happened). `workflow_claims` holds renewable ownership leases for jobs and company research. `scan_history` replaces file-based discovery history. `job_descriptions` stores exact Markdown content keyed by permanent job ID, with file provenance, hash, revision and sync time. Readable JD files remain in private `data/jds/`; reports and generated documents remain files.
+The `jobs` table owns permanent IDs and application status. `evaluations` records immutable completion keys and reports. `job_status_events` records transitions, separating `created_at` (when PostgreSQL recorded the row) from nullable `occurred_at` (when the transition is known to have happened). `workflow_claims` holds renewable ownership leases for jobs and company research. `scan_history` replaces file-based discovery history. `job_descriptions` stores exact Markdown content keyed by permanent job ID, with file provenance, hash, revision and sync time. `browser_runs` records work launched from the browser dashboard (action, optional job, queued/running/completed/failed/interrupted state, phase, process id and start time, log file name); its states are separate from job statuses and its four SQL functions make transitions once-only and forward-only. `llm_calls` records one row per launcher LLM call with token counts (provider, model, function label, optional job and browser run, uncached/cache/output/reasoning tokens, `usage_missing` flag, source `live` or `backfill`); it is accounting only and never touches job statuses. Readable JD files remain in private `data/jds/`; reports and generated documents remain files.
 
 ## Application statuses
 
@@ -21,7 +21,7 @@ The `jobs` table owns permanent IDs and application status. `evaluations` record
 
 `SKIP` was merged into `Discarded` by migration 006. The dashboard runs `ghost_stale_applications()` before each load; only jobs still in Applied with a known `applied_at` more than 40 days ago move automatically. Entering Applied records `applied_at`. Migration 007 recovers exact historical application dates from legacy `Applied YYYY-MM-DD` notes. Migration 008 records status occurrence time separately and recovers old dates only from preserved evidence such as an exact application date, a dated evaluation report, or an explicit status/date note. Unrecoverable historical dates remain null; the dashboard labels them `unknown` and never substitutes the database-import timestamp.
 
-To add or rename a status: write a numbered migration that alters the constraint and the transition function, regenerate `infra/sql/schema.sql` with `node src/helpers/db-schema.mjs`, then update the dashboard status handling in `dashboard/internal/data/career.go` and `internal/ui/screens/pipeline.go`.
+To add or rename a status: write a numbered migration that alters the constraint and the transition function, regenerate `infra/sql/schema.sql` with `node src/helpers/db-schema.mjs`, then update the dashboard status handling in `src/server/jobs-write.mjs`, `src/server/schemas.mjs` and `web/src/`.
 
 ## JD synchronization
 
@@ -39,7 +39,7 @@ Newly ingested or synchronized JDs include an HTML comment `career-ops-job-id: I
 4. For legacy recovery only, audit with `npm run db:audit` and follow the migration recovery section. A fresh installation does not require a legacy cutover.
 5. Launch the dashboard from the repository, or give it `--path` pointing here.
 
-The default connection is `127.0.0.1:54329`, database/user `career_ops`. Both Node and Go read the repository `.env`, with process environment overrides. `DATABASE_URL` overrides individual settings. Do not commit passwords, database volumes, backups, or imported personal data.
+The default connection is `127.0.0.1:54329`, database/user `career_ops`. The Node server and launchers read the repository `.env`, with process environment overrides. `DATABASE_URL` overrides individual settings. Do not commit passwords, database volumes, backups, or imported personal data.
 
 ## Operations
 
@@ -52,6 +52,12 @@ The default connection is `127.0.0.1:54329`, database/user `career_ops`. Both No
 - `node src/helpers/inspect-pipeline.mjs jobs` or `job ID`: inspect structured records.
 - `node src/helpers/move-status.mjs ID STATUS [reason]`: revision-checked status change.
 - `node src/helpers/job-update.mjs ID --note="TEXT" --role="TITLE"`: update only supplied metadata; `--revision=N` detects stale edits.
+
+### Backup, restore check and schema rollback
+
+- **Prove a backup restores.** `npm run db:backup`, then `node src/helpers/db-infra.mjs restore data/backups/<file>.dump career_ops_restore_<stamp>` (lowercase letters, digits and underscores; the name must start `career_ops_restore_`). Compare per-table `count(*)` between `career_ops` and the restore database with read-only queries, then drop the restore database (`docker compose ... exec postgres dropdb -U career_ops career_ops_restore_<stamp>`). Record counts only, never rows. The 2026-11-10 rehearsal matched on all tables; its transcript is `reviews/4.2/backup-restore-transcript.md`. The restore target is always a new database, never `career_ops`.
+- **Roll back the additive browser schema** (migrations 009 salary band and 010 browser runs) only with the documented, tested procedure in `documentation/dashboard-migration/design/ROLLBACK.md`: reverse order, one transaction per block, `schema_migrations` row removed so `npm run db:migrate` re-applies the unchanged file. It loses the stored salary bands and the browser run history, and nothing else. `src/helpers/test-rollback-rehearsal.mjs` (part of `npm run db:test`) applies, rolls back and re-applies both in a unique schema of the isolated test database. Never edit an applied migration and never run the rollback on the personal database without a fresh backup and the user's go-ahead.
+- **Check for task records left by the retired TUI** with `node src/helpers/legacy-tasks.mjs` (read-only; exit 2 when a task is still running with a live owner).
 
 Database outages are errors. There is no alternate writable file backend. Evaluation completion is per job; SQL protects status changes from late evaluation results. File publication happens before the completion transaction; an interrupted publication can leave an unreferenced report, and retry reuses the same immutable content.
 

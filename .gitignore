@@ -35,14 +35,6 @@ data/writing-samples/*
 logs/
 .playwright-mcp/
 
-# --- Build artifacts ---
-dashboard/dashboard.exe
-dashboard/dashboard
-dashboard/*.exe
-dashboard/*.exe~
-dashboard/dash.lnk
-dashboard/launch-log.txt
-
 # --- Secrets ---
 .env
 .env.*
@@ -64,7 +56,6 @@ bun.lock
 /.agents/
 /.codex/
 /.aws/
-/.tmp-go-cache/
 
 # Generated browser dashboard artifacts
 /web/dist/

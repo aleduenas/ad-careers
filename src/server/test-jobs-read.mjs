@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { createJobsReader, normalizeJobsQuery } from './jobs-read.mjs';
+import { createJobsReader, isoWeekKey, normalizeJobsQuery } from './jobs-read.mjs';
 import { resolveJobMaterials } from './jobs-materials.mjs';
 import { readReportCompensation } from './jobs-compensation.mjs';
 import { mkdtemp, mkdir, realpath, rm, writeFile, lstat } from 'node:fs/promises';
@@ -309,4 +309,99 @@ test('compensation projection stays inside allowed roots and distinguishes band,
       state: 'invalid',
     });
   });
+});
+
+test('D061 score, week and any filters normalize strictly and omit unset fields', () => {
+  const ok = normalizeJobsQuery({ scoreMin: '3.5', scoreMax: 4, addedWeek: '2026-W01' }).query;
+  assert.equal(ok.scoreMin, 3.5);
+  assert.equal(ok.scoreMax, 4);
+  assert.equal(ok.addedWeek, '2026-W01');
+  assert.equal(normalizeJobsQuery({ filter: 'any' }).query.filter, 'any');
+  const bare = normalizeJobsQuery({}).query;
+  for (const field of ['scoreMin', 'scoreMax', 'addedWeek']) assert.equal(field in bare, false);
+  assert.equal(normalizeJobsQuery({ scoreMin: '0', scoreMax: '5' }).query.scoreMax, 5);
+  for (const [raw, field] of [
+    [{ scoreMin: '5.1' }, 'scoreMin'],
+    [{ scoreMin: '3.55' }, 'scoreMin'],
+    [{ scoreMin: '-1' }, 'scoreMin'],
+    [{ scoreMin: 'abc' }, 'scoreMin'],
+    [{ scoreMin: '' }, 'scoreMin'],
+    [{ scoreMax: 6 }, 'scoreMax'],
+    [{ scoreMax: 3.55 }, 'scoreMax'],
+    [{ scoreMin: '4', scoreMax: '3' }, 'scoreMax'],
+    [{ addedWeek: '2026-W54' }, 'addedWeek'],
+    [{ addedWeek: '2026-W00' }, 'addedWeek'],
+    [{ addedWeek: '2026-01-01' }, 'addedWeek'],
+    [{ addedWeek: 202601 }, 'addedWeek'],
+  ])
+    assert.throws(
+      () => normalizeJobsQuery(raw),
+      error => error.publicCode === 'INVALID_REQUEST' && field in error.fields,
+      JSON.stringify(raw),
+    );
+});
+
+test('D061 score bounds only match positive scores; bounds are min-inclusive, max-exclusive', async () => {
+  const { reader } = readerFor();
+  const ids = async q => (await reader.list({ filter: 'any', ...q })).items.map(i => i.id).sort();
+  assert.deepEqual(await ids({ scoreMin: '4' }), ['2', '4', '5', '8', HUGE_ID].sort());
+  assert.deepEqual(await ids({ scoreMin: '4', scoreMax: '4.5' }), ['2', '8']);
+  assert.deepEqual(await ids({ scoreMax: '3.5' }), ['6']);
+  const zero = [
+    row('1', 'Evaluated', { score: '0' }),
+    row('2', 'Evaluated', { score: null }),
+    row('3', 'Evaluated', { score: '2.0' }),
+  ];
+  const zeroReader = readerFor(zero).reader;
+  assert.deepEqual(
+    (await zeroReader.list({ filter: 'any', scoreMax: '5' })).items.map(i => i.id),
+    ['3'],
+  );
+  assert.equal((await zeroReader.list({ filter: 'any' })).totalCount, 3);
+});
+
+test('D061 addedWeek matches the ISO week used by weeklyActivity; any includes Pending', async () => {
+  assert.equal(isoWeekKey('2026-01-01'), '2026-W01');
+  assert.equal(isoWeekKey('2024-12-30'), '2025-W01');
+  assert.equal(isoWeekKey('nope'), null);
+  const rows = [
+    row('1', 'Evaluated', { source_date: '2026-01-05' }),
+    row('2', 'Pending', { source_date: '2026-01-06' }),
+    row('3', 'Evaluated', { source_date: null, first_seen: '2026-01-11' }),
+    row('4', 'Evaluated', { source_date: '2026-01-12' }),
+  ];
+  const { reader } = readerFor(rows);
+  const week = async q => (await reader.list(q)).items.map(i => i.id).sort();
+  assert.deepEqual(await week({ filter: 'any', addedWeek: '2026-W02' }), ['1', '2', '3']);
+  assert.deepEqual(await week({ addedWeek: '2026-W02' }), ['1', '3']);
+  assert.deepEqual(await week({ filter: 'pending' }), ['2']);
+  const overview = await reader.overview();
+  const weeks = Object.fromEntries(overview.progress.weeklyActivity.map(w => [w.week, w.count]));
+  assert.equal(weeks['2026-W02'], 3);
+  assert.equal(weeks['2026-W03'], 1);
+  const echoed = (await reader.list({ filter: 'any', scoreMin: '1', addedWeek: '2026-W02' })).query;
+  assert.equal(echoed.scoreMin, 1);
+  assert.equal(echoed.addedWeek, '2026-W02');
+  assert.equal('scoreMax' in echoed, false);
+});
+
+test('D061 cursors are bound to the new filter fields', async () => {
+  const { reader } = readerFor();
+  const first = await reader.list({ filter: 'any', limit: '2', scoreMin: '3' });
+  assert.ok(first.nextCursor);
+  await reader.list({ filter: 'any', limit: '2', scoreMin: '3', cursor: first.nextCursor });
+  for (const other of [
+    { scoreMin: '3.5' },
+    { scoreMax: '5' },
+    { scoreMin: '3', addedWeek: '2026-W01' },
+    {},
+  ])
+    await assert.rejects(
+      reader.list({ filter: 'any', limit: '2', ...other, cursor: first.nextCursor }),
+      { publicCode: 'INVALID_REQUEST' },
+    );
+  await assert.rejects(
+    reader.list({ filter: 'all', limit: '2', scoreMin: '3', cursor: first.nextCursor }),
+    { publicCode: 'INVALID_REQUEST' },
+  );
 });

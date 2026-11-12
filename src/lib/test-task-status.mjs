@@ -51,10 +51,68 @@ try {
   assert.equal(saved.exit_code, 1);
   assert.equal(saved.number, 1152, 'the record keeps identifying its job after a crash');
 
+  // Run-aware path: calls go through the injected query, are bounded, and never throw.
+  const { createRunReporter } = await import('./_task-status.mjs');
+  const runId = '11111111-2222-4333-8444-555555555555';
+  const calls = [];
+  const reporter = createRunReporter({
+    runId,
+    query: async (sql, args) => {
+      calls.push([sql, args]);
+      return [];
+    },
+  });
+  await reporter.report('drafting', 2);
+  await reporter.finish('completed', 0);
+  assert.equal(calls.length, 2);
+  assert.match(calls[0][0], /report_browser_run/);
+  assert.deepEqual(calls[0][1], [runId, 'drafting', 2]);
+  assert.match(calls[1][0], /finish_browser_run/);
+  assert.deepEqual(calls[1][1], [runId, 'completed', 0, null]);
+  const off = [];
+  const disabled = createRunReporter({ runId: 'not-a-uuid', query: async (...a) => off.push(a) });
+  await disabled.report('x', 1);
+  await disabled.finish('failed', 1, 'EXIT_NONZERO');
+  assert.equal(off.length, 0, 'an invalid run id disables reporting');
+  const failing = createRunReporter({
+    runId,
+    query: async () => {
+      throw new Error('driver detail');
+    },
+  });
+  await assert.doesNotReject(failing.report('x', 1));
+  await assert.doesNotReject(failing.finish('failed', 1));
+  const started = Date.now();
+  const hanging = createRunReporter({ runId, query: () => new Promise(() => {}), timeoutMs: 50 });
+  await hanging.finish('completed', 0);
+  assert.ok(Date.now() - started < 2000, 'a hung database call is bounded');
+
+  // With CAREER_RUN_ID set and an unreachable database, the task still ends normally.
+  writeFileSync(record, JSON.stringify({ action: 'cv', number: 7, state: 'running' }));
+  const script = join(test, 'run-worker.mjs');
+  writeFileSync(
+    script,
+    'import { reportPhase } from ' +
+      JSON.stringify(pathToFileURL(join(here, '_task-status.mjs')).href) +
+      "\nreportPhase('working');\n",
+  );
+  const guarded = spawnSync(process.execPath, [script], {
+    env: {
+      ...process.env,
+      CAREER_TASK_FILE: record,
+      CAREER_RUN_ID: runId,
+      DATABASE_URL: 'postgres://nobody@127.0.0.1:1/career_ops_test_unreachable',
+    },
+    encoding: 'utf8',
+    timeout: 30000,
+  });
+  assert.equal(guarded.status, 0, guarded.stderr);
+  assert.equal(JSON.parse(readFileSync(record, 'utf8')).state, 'completed');
+
   // No temporary files are left beside the record.
   assert.ok(!existsSync(record + '.tmp'));
   console.log(
-    'Task status tests passed: no-op without a task file, phase/retry updates, and terminal state on clean exit and crash.',
+    'Task status tests passed: no-op without a task file, phase/retry updates, and terminal state on clean exit and crash, and the bounded run-aware reporter.',
   );
 } finally {
   if (dirname(test) !== resolve(tmpdir()) || !test.includes('career-task-status-'))

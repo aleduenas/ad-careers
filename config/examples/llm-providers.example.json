@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "models": {
+    "claude": ["sonnet", "opus", "haiku"],
+    "codex": ["gpt-6.1-sol", "gpt-6-luna"]
+  },
+  "functions": {
+    "evaluation": { "provider": "claude", "model": "sonnet" },
+    "companyResearch": { "provider": "claude", "model": "haiku" },
+    "cv": { "provider": "claude", "model": "sonnet" },
+    "coverLetter": { "provider": "codex", "model": "gpt-6.1-sol" }
+  }
+}

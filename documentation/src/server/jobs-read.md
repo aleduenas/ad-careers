@@ -1,7 +1,7 @@
 # src/server/jobs-read.mjs
 
-**Authority:** `documentation/dashboard-migration/design/STAGE2_READ_CONTRACT.md` and the Go
-`dashboard/internal/data/database.go` `LoadApplications` SELECT it reuses (without the
+**Authority:** `documentation/dashboard-migration/design/STAGE2_READ_CONTRACT.md` and the
+applications SELECT of the retired Go TUI, which it reuses (without the
 `ghost_stale_applications()` call, which is a Stage 3.2 write).
 
 Read-only data layer for `GET /api/v1/jobs` and `GET /api/v1/overview`.
@@ -9,6 +9,12 @@ Read-only data layer for `GET /api/v1/jobs` and `GET /api/v1/overview`.
 - `normalizeJobsQuery(raw)` validates `q`, `filter`, `sort`, `direction`, `grouped`, `limit` and
   the opaque `cursor` strictly (closed enums, bounded lengths, no coercion) and throws a 400
   `INVALID_REQUEST` error naming the offending field.
+- D061 adds optional `scoreMin` (inclusive) and `scoreMax` (exclusive), each a decimal with at most
+  one decimal place in 0..5, and `addedWeek` (`YYYY-Www`). Score bounds match only rows with a
+  score above 0, the overview bucket population. `scoreMin > scoreMax` is a 400 on `scoreMax`.
+  Unset fields are absent from the normalized query, so they are absent from the echoed `query` and
+  from the cursor fingerprint. The filter `any` applies no status filter (Pending included).
+- `isoWeekKey(date)` is the single ISO-week computation shared by `weeklyActivity` and `addedWeek`.
 - `createJobsReader({query, resolveMaterials, readCompensation, cursorKey, rootDir})` returns
   `{list, overview}`. Every transport is injectable so tests never need PostgreSQL; the defaults
   are the `src/lib/_database.mjs` `query`, `jobs-materials.mjs` and `jobs-compensation.mjs`.
@@ -28,3 +34,5 @@ Database driver errors become `DatabaseUnavailableError`; missing relations beco
 
 **Tests:** `node --test src/server/test-jobs-read.mjs` (synthetic rows) and
 `src/server/test-jobs-database.mjs` (isolated PostgreSQL through `node src/helpers/db-test.mjs`).
+
+`projectJob(row, materialMap, compensation)` is also exported so the job detail service projects its job exactly as the list does.

@@ -21,7 +21,8 @@ browser UI under `web/` from the accepted green light/dark design.
 - Only call endpoints that exist in `src/server/schemas.mjs`. Ask the lead for contract changes.
 - Keep API calls, error handling and the stale/conflict message in one place (`web/src/api.ts`).
 - Search, filter, sort and pagination state live in the URL and survive reload and back.
-- Render JD, report and notes text as text, never as HTML.
+- Render JD and notes text as text, never as HTML. The evaluation report is rendered as
+  Markdown through react-markdown (no raw-HTML passthrough, no images); never innerHTML (D062).
 - Truthful states: loading, empty, no matches, database unavailable, stale edit, failed task.
   Never substitute sample data for a failed read. Preserve unsaved input on errors.
 - Keep keyboard focus visible, controls labelled, dialogs keyboard-operable, and check 1440,

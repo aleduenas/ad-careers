@@ -17,6 +17,7 @@ const STATUSES = [
 ];
 const FILTERS = new Set([
   'all',
+  'any',
   'pending',
   'evaluated',
   'applied',
@@ -64,9 +65,47 @@ function requestError(field, message = 'Query parameter is invalid.') {
   return error;
 }
 
+const WEEK_PATTERN = /^[0-9]{4}-W(0[1-9]|[1-4][0-9]|5[0-3])$/;
+
+function parseScoreBound(value, field) {
+  if (value === undefined) return undefined;
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value) || value < 0 || value > 5 || Math.round(value * 10) / 10 !== value)
+      throw requestError(field);
+    return value;
+  }
+  if (typeof value !== 'string' || !/^[0-5](.[0-9])?$/.test(value)) throw requestError(field);
+  const number = Number(value);
+  if (number > 5) throw requestError(field);
+  return number;
+}
+
+/** ISO week key (YYYY-Www) for a YYYY-MM-DD date string, or null when unparseable. */
+export function isoWeekKey(dateString) {
+  if (!dateString) return null;
+  const parsed = new Date(`${dateString}T00:00:00Z`);
+  if (Number.isNaN(parsed.valueOf())) return null;
+  const thursday = new Date(parsed);
+  thursday.setUTCDate(parsed.getUTCDate() + 4 - (parsed.getUTCDay() || 7));
+  const yearStart = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 1));
+  const week = Math.ceil(((thursday - yearStart) / 86400000 + 1) / 7);
+  return `${thursday.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+}
+
 export function normalizeJobsQuery(raw = {}) {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw requestError('query');
-  const allowed = new Set(['q', 'filter', 'sort', 'direction', 'grouped', 'limit', 'cursor']);
+  const allowed = new Set([
+    'q',
+    'filter',
+    'sort',
+    'direction',
+    'grouped',
+    'limit',
+    'cursor',
+    'scoreMin',
+    'scoreMax',
+    'addedWeek',
+  ]);
   for (const key of Object.keys(raw)) if (!allowed.has(key)) throw requestError(key);
   const q = raw.q ?? '';
   if (typeof q !== 'string' || [...q].length > 200) throw requestError('q');
@@ -87,10 +126,19 @@ export function normalizeJobsQuery(raw = {}) {
   const cursor = raw.cursor;
   if (cursor !== undefined && (typeof cursor !== 'string' || cursor.length > 2048 || !cursor))
     throw requestError('cursor');
-  return {
-    query: { q, filter, sort, direction, grouped: grouped === 'true', limit },
-    cursor,
-  };
+  const query = { q, filter, sort, direction, grouped: grouped === 'true', limit };
+  const scoreMin = parseScoreBound(raw.scoreMin, 'scoreMin');
+  const scoreMax = parseScoreBound(raw.scoreMax, 'scoreMax');
+  if (scoreMin !== undefined && scoreMax !== undefined && scoreMin > scoreMax)
+    throw requestError('scoreMax');
+  if (scoreMin !== undefined) query.scoreMin = scoreMin;
+  if (scoreMax !== undefined) query.scoreMax = scoreMax;
+  if (raw.addedWeek !== undefined) {
+    if (typeof raw.addedWeek !== 'string' || !WEEK_PATTERN.test(raw.addedWeek))
+      throw requestError('addedWeek');
+    query.addedWeek = raw.addedWeek;
+  }
+  return { query, cursor };
 }
 
 function cursorError() {
@@ -233,6 +281,7 @@ function compareRows(a, b, query, materialMap) {
 }
 
 function selected(row, filter) {
+  if (filter === 'any') return true;
   if (filter === 'all') return row.status !== 'Pending';
   if (filter === 'pending') return row.status === 'Pending';
   if (filter === 'top')
@@ -242,6 +291,17 @@ function selected(row, filter) {
       !['Ghosted', 'Discarded'].includes(row.status)
     );
   return row.status.toLowerCase() === filter;
+}
+
+function inScoreWeek(row, query) {
+  if (query.scoreMin !== undefined || query.scoreMax !== undefined) {
+    const score = safeNumber(row.score);
+    if (score === null || score <= 0) return false;
+    if (query.scoreMin !== undefined && score < query.scoreMin) return false;
+    if (query.scoreMax !== undefined && score >= query.scoreMax) return false;
+  }
+  if (query.addedWeek !== undefined && isoWeekKey(addedDate(row)) !== query.addedWeek) return false;
+  return true;
 }
 
 function safeUrl(value) {
@@ -286,7 +346,7 @@ async function mapLimit(items, limit, callback) {
   return output;
 }
 
-function projectJob(row, materialMap, compensation) {
+export function projectJob(row, materialMap, compensation) {
   const salary = salaryPair(row);
   const manualValid =
     salary &&
@@ -382,15 +442,8 @@ function overviewFromRows(rows) {
   const labels = ['4.5-5.0', '4.0-4.4', '3.5-3.9', '3.0-3.4', '  <3.0'];
   const weeks = new Map();
   for (const row of rows) {
-    const date = addedDate(row);
-    if (!date) continue;
-    const parsed = new Date(`${date}T00:00:00Z`);
-    if (Number.isNaN(parsed.valueOf())) continue;
-    const thursday = new Date(parsed);
-    thursday.setUTCDate(parsed.getUTCDate() + 4 - (parsed.getUTCDay() || 7));
-    const yearStart = new Date(Date.UTC(thursday.getUTCFullYear(), 0, 1));
-    const week = Math.ceil(((thursday - yearStart) / 86400000 + 1) / 7);
-    const key = `${thursday.getUTCFullYear()}-W${String(week).padStart(2, '0')}`;
+    const key = isoWeekKey(addedDate(row));
+    if (!key) continue;
     weeks.set(key, (weeks.get(key) || 0) + 1);
   }
   const weeklyActivity = [...weeks]
@@ -452,7 +505,10 @@ export function createJobsReader({
     const offset = cursor === undefined ? 0 : verifyOffset(cursor, normalized, key);
     const rows = await loadRows();
     const filtered = rows.filter(
-      row => selected(row, normalized.filter) && matches(row, normalized.q),
+      row =>
+        selected(row, normalized.filter) &&
+        matches(row, normalized.q) &&
+        inScoreWeek(row, normalized),
     );
     const materials = await resolveMaterials(filtered, rootDir);
     const map = materials instanceof Map ? materials : new Map(Object.entries(materials || {}));

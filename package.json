@@ -9,6 +9,14 @@
     "web:build": "npm run web:typecheck && vite build --config web/vite.config.mjs",
     "web:dev": "vite --config web/vite.config.mjs",
     "web:start": "node src/server/start.mjs",
+    "web:start:win": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File src/helpers/Start-Dashboard.ps1",
+    "web:up": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File src/helpers/Start-Dashboard.ps1 -Up",
+    "web:down": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File src/helpers/Start-Dashboard.ps1 -Stop",
+    "web:restart": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File src/helpers/Start-Dashboard.ps1 -Restart",
+    "web:status": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File src/helpers/Start-Dashboard.ps1 -Status",
+    "web:install": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File src/helpers/Start-Dashboard.ps1 -Install",
+    "web:uninstall": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File src/helpers/Start-Dashboard.ps1 -Uninstall",
+    "tasks:legacy": "node src/helpers/legacy-tasks.mjs",
     "verify": "node src/helpers/verify-pipeline.mjs",
     "pdf": "node src/cvgen/generate-pdf.mjs",
     "scan": "node src/scan/scan.mjs",
@@ -40,7 +48,9 @@
     "pg": "^8.23.0",
     "playwright": "^1.58.1",
     "react": "19.3.1",
-    "react-dom": "19.3.1"
+    "react-dom": "19.3.1",
+    "react-markdown": "10.1.0",
+    "remark-gfm": "4.0.1"
   },
   "devDependencies": {
     "@types/react": "19.3.0",

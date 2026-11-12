@@ -1,7 +1,7 @@
 # src/server/jobs-materials.mjs
 
 **Authority:** the source file; artifact identity rules in `documentation/guides/layout.md`
-(artifact identity) and the Go `career.go` matching this module ports.
+(artifact identity).
 
 Exports `resolveJobMaterials(rows, rootDir)`, returning a `Map` from job ID (decimal string) to
 `{cv, letter}` flags that drive the CV and Letter badges in the jobs list. It enumerates
@@ -15,6 +15,13 @@ Matching order per job:
 2. Otherwise legacy folders (no ID suffix) are matched by normalized company slug (corporate
    suffixes stripped, hyphen-insensitive containment), then exact role slug, then token
    similarity at or above 0.75 with no tie.
+
+`resolveJobMaterialDetail(row, rootDir)` returns `{match:'id'|'legacy'|'none', ambiguous, dir, files}`
+for one job using the same matching: `dir` is the real matched folder inside `output/` and `files`
+holds the preferred file per key (`cv`, `letter`, `brief`) as `{name, kind}`. `pickMaterials(names)`
+encodes the preference: `cv-*.pdf` before `cv-*.html`; letter `cover-letter.md`, `.pdf`, `.html`,
+`cover-letter-draft.md`; brief `cover-letter-brief*.md`; names are sorted so ties are stable.
+`slug` is also exported for the interview-prep matcher. The 2.1 flags API is unchanged.
 
 A folder counts as `cv` when it holds `cv-*.pdf` or `cv-*.html`, and as `letter` for
 `cover-letter.md|pdf|html`, `cover-letter-draft.md` or a `cover-letter-brief*.md`. The module
