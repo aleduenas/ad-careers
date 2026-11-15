@@ -40,7 +40,7 @@
 }
 
 @media (min-width: 1024px) {
-.ws-panel {
+  .ws-panel {
     inset: 0 68px 0 auto;
     width: min(50vw, 760px);
     border-left: 1px solid var(--line);
@@ -53,7 +53,12 @@
 }
 
 @media (min-width: 1024px) {
-.ws-panel.ws-panel-solo {
+  .ws-panel.ws-panel-solo {
     right: 0;
   }
+}
+
+/* Must follow ".job-group h3" (pages/jobs.css). */
+.ws-panel .ws-panel-body h3 {
+  margin: 0 0 10px;
 }

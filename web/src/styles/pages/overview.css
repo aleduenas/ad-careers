@@ -1,5 +1,12 @@
 /* The overview page. */
 
+.status-counts,
+.bucket-list,
+.weekly-list {
+  display: grid;
+  gap: 0;
+}
+
 /* The overview page. */
 .metric-grid {
   display: grid;
@@ -103,11 +110,11 @@
 }
 
 @media (max-width: 900px) {
-.metric-grid {
+  .metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-.overview-grid {
+  .overview-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -120,6 +120,16 @@
   min-width: 28ch;
 }
 
+.report-prose > :first-child {
+  margin-top: 0;
+}
+
+.report-prose a {
+  color: var(--green);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 /* Must follow ".report-prose > :first-child" (pages/workspace.css). */
 .report-prose .rp-h1,
 .report-prose .rp-h2,

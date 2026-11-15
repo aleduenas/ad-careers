@@ -14,8 +14,11 @@
 }
 
 .jd-view-switch button[aria-pressed='true'] {
-  border-color: var(--green);
-  background: var(--green-bg);
   color: var(--green);
   font-weight: 700;
+}
+
+.jd-view-switch button[aria-pressed='true']:not(:hover:not(:disabled)) {
+  border-color: var(--green);
+  background: var(--green-bg);
 }

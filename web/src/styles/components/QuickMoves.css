@@ -13,14 +13,6 @@
   gap: 6px;
 }
 
-.quick-move {
-  min-height: 30px;
-  padding: 3px 12px;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 700;
-}
-
 .quick-move-next {
   border-color: var(--green);
   background: var(--green-bg);
@@ -32,10 +24,10 @@
   color: var(--paper);
 }
 
-.quick-move-reject {
-  border-color: var(--red);
-  background: var(--red-bg);
-  color: var(--red);
+.quick-move-reject:hover:not(:disabled),
+.quick-move-reject.is-confirming {
+  background: var(--red);
+  color: var(--paper);
 }
 
 .quick-move-notice {

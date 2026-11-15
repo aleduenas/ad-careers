@@ -38,7 +38,7 @@
 }
 
 @media (min-width: 1024px) {
-.discover-grid {
+  .discover-grid {
     grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
     align-items: start;
   }
@@ -60,10 +60,4 @@
 .url-row input {
   flex: 1 1 auto;
   min-width: 0;
-}
-
-/* Kept in this file, not in components/SlidePanel.css, to hold its place relative to ".discover-card h3, .discover-card h4, .discover-ca". */
-/* Must follow ".job-group h3" (pages/jobs.css). */
-.ws-panel-body h3 {
-  margin: 0 0 10px;
 }

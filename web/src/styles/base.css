@@ -177,31 +177,31 @@ footer {
 }
 
 @media (min-width: 1500px) {
-main#main {
+  main#main {
     padding-right: 44px;
     padding-left: 44px;
   }
 }
 
 @media (max-width: 1100px) {
-main#main {
+  main#main {
     padding: 28px 24px 36px;
   }
 }
 
 @media (max-width: 700px) {
-main#main {
+  main#main {
     padding: 24px 17px 30px;
   }
 
-footer {
+  footer {
     padding: 14px 17px;
     font-size: 10px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-*,
+  *,
   *::before,
   *::after {
     scroll-behavior: auto !important;
@@ -211,7 +211,15 @@ footer {
   }
 }
 
-/* Must follow ".is-workspace main#main" (layout.css). */
-main#main[data-page='jobs'] {
-  padding-top: 16px;
+dialog::backdrop {
+  position: fixed;
+  z-index: 50;
+  inset: 0;
+  background: #10171499;
+  backdrop-filter: blur(2px);
+}
+
+fieldset legend {
+  font-size: 13px;
+  font-weight: 600;
 }

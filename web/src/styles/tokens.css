@@ -63,14 +63,14 @@
 }
 
 @media (min-width: 701px) {
-/* Package 4.3 F12: breathing room in the workspace; F13: Add a job on the Jobs page; F14: details. */
-:root {
+  /* Package 4.3 F12: breathing room in the workspace; F13: Add a job on the Jobs page; F14: details. */
+  :root {
     --gutter: 32px;
   }
 }
 
 @media (min-width: 1024px) {
-:root {
+  :root {
     --gutter: 44px;
   }
 }

@@ -15,7 +15,7 @@ no per-file page.
 | `api.ts` | The only place that calls the server: typed client, error classes, the stale/conflict message | `generated/` |
 | `generated/api.d.ts` | Wire types generated from `src/server/schemas.mjs`; never edited | nothing |
 | `styles.css` | The stylesheet index: `@import`s of `styles/` in a fixed order | `styles/` |
-| `styles/` | Every stylesheet: `tokens`, `base`, `layout`, `controls` (shared); `components/<name>.css`; `pages/<page>.css`; `layout-late.css` last | nothing |
+| `styles/` | Every stylesheet: `tokens`, `base`, `layout`, `controls` (shared); `components/<name>.css`; `pages/<page>.css`, loaded in that order | nothing |
 
 Rules for imports: `lib/` never imports a component or page; `components/` never imports a page;
 a page does not import another page's internals. One exception is recorded here: the Jobs page
@@ -78,14 +78,11 @@ fixture server they run against.
 - **One stylesheet system.** Every rule lives under `styles/` and loads through the `styles.css`
   index, imported once by `main.tsx`. No other `.ts` or `.tsx` file imports CSS (`src/test-all.mjs`
   fails if one does). A new rule goes in the file of the page or component it styles.
-- **Import order is the cascade.** Never sort or reorder the index. Rules that target the same
-  element at the same specificity win by position, so a few files sit earlier than their kind
-  suggests (`discard-dialog`, `jobs-batch`, `workspace-jd-text`, `discover-posting-check` load
-  before one or more of `layout`, `base` and `controls` because some declarations must lose to those),
-  some rules sit beside the rule they must follow with a comment naming their owner file, and
-  `layout-late.css` holds the few that must come last. A rule that must beat an earlier rule goes
-  after it; a dark-theme rule goes after the light rule it overrides. Removing those order
-  dependencies (dead declarations, owner-file placement) is open cleanup work.
+- **Import order is the cascade.** `styles.css` imports `tokens`, `base`, `layout`, `controls`, then
+  `components/*` and `pages/*` alphabetically, and every rule lives in the file of the thing it styles. A
+  later file wins over an earlier one at equal specificity, so do not sort or reorder the index. When a
+  new rule must beat a rule in another file, scope it under its page or component root (one more class);
+  do not rely on file order. A dark-theme rule goes after the light rule it overrides in the same file.
 - **URL state.** Search, filter, sort and pagination live in the URL (`lib/jobsLocation.ts`, the
   Tasks location hook) so reload and back work. Do not mirror them in component state only.
 - **Session nonce.** The nonce from `/session` stays in memory and goes out only as a request

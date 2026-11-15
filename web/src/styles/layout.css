@@ -143,17 +143,7 @@
   font-size: 10px;
 }
 
-.local-pip,
-.status-dot {
-  display: inline-block;
-  width: 8px;
-  height: 8px;
-  flex: none;
-  border-radius: 50%;
-  background: #358467;
-}
-
-.local-pip {
+.sidebar-foot .local-pip {
   margin-right: 6px;
   background: #91e0b7;
   box-shadow: 0 0 0 3px #91e0b726;
@@ -228,27 +218,27 @@
 }
 
 @media (max-width: 1100px) {
-.app-shell {
+  .app-shell {
     grid-template-columns: 200px minmax(0, 1fr);
   }
 
-.sidebar {
+  .sidebar {
     padding-right: 12px;
     padding-left: 12px;
   }
 
-.topbar {
+  .topbar {
     padding-right: 24px;
     padding-left: 24px;
   }
 }
 
 @media (max-width: 700px) {
-.app-shell {
+  .app-shell {
     display: block;
   }
 
-.sidebar {
+  .sidebar {
     position: relative;
     z-index: 2;
     height: auto;
@@ -256,22 +246,22 @@
     padding: 13px 16px 0;
   }
 
-.brand {
+  .brand {
     margin: 0 0 12px;
     font-size: 16px;
   }
 
-.brand-mark {
+  .brand-mark {
     width: 34px;
     height: 34px;
   }
 
-.nav-heading,
+  .nav-heading,
   .sidebar-foot {
     display: none;
   }
 
-.sidebar nav {
+  .sidebar nav {
     flex-direction: row;
     gap: 4px;
     overflow-x: auto;
@@ -280,7 +270,7 @@
     scrollbar-width: thin;
   }
 
-.sidebar nav a {
+  .sidebar nav a {
     min-height: 38px;
     flex: none;
     gap: 7px;
@@ -289,12 +279,12 @@
     font-size: 12px;
   }
 
-.sidebar nav a > span:first-child {
+  .sidebar nav a > span:first-child {
     width: 15px;
     font-size: 14px;
   }
 
-.topbar {
+  .topbar {
     min-height: 58px;
     align-items: flex-start;
     flex-direction: column;
@@ -302,18 +292,18 @@
     padding: 12px 17px;
   }
 
-.top-actions {
+  .top-actions {
     width: 100%;
     justify-content: flex-start;
   }
 
-.top-actions button {
+  .top-actions button {
     min-height: 37px;
     padding: 7px 10px;
     font-size: 11px;
   }
 
-.page-heading {
+  .page-heading {
     align-items: flex-start;
     flex-direction: column;
     gap: 13px;
@@ -337,56 +327,56 @@
 }
 
 @media (max-width: 700px) {
-.nav-count {
+  .nav-count {
     margin-left: 4px;
   }
 }
 
 @media (min-width: 701px) {
-.app-shell.is-workspace {
+  .app-shell.is-workspace {
     grid-template-columns: 56px minmax(0, 1fr);
   }
 
-.is-workspace .sidebar {
+  .is-workspace .sidebar {
     padding: 14px 6px;
     min-height: 0;
   }
 
-.is-workspace .brand > span:last-child,
+  .is-workspace .brand > span:last-child,
   .is-workspace .nav-heading,
   .is-workspace .sidebar-foot {
     display: none;
   }
 
-.is-workspace .sidebar nav a {
+  .is-workspace .sidebar nav a {
     justify-content: center;
     padding: 9px 0;
     gap: 0;
     font-size: 0;
   }
 
-.is-workspace .sidebar nav a > span:first-child {
+  .is-workspace .sidebar nav a > span:first-child {
     width: auto;
     font-size: 16px;
   }
 
-.is-workspace .sidebar nav a .nav-count {
+  .is-workspace .sidebar nav a .nav-count {
     display: none;
   }
 
-.is-workspace main#main {
+  .is-workspace main#main {
     max-width: none;
     padding: 0;
   }
 }
 
 @media (min-width: 1024px) {
-.is-workspace .main-shell {
+  .is-workspace .main-shell {
     height: 100vh;
     min-height: 0;
   }
 
-.is-workspace main#main {
+  .is-workspace main#main {
     display: flex;
     min-height: 0;
     flex-direction: column;
@@ -426,37 +416,37 @@
 }
 
 @media (max-width: 700px) {
-.app-shell {
+  .app-shell {
     --banner-h: 64px;
   }
 
-/* The banner is part of the page flow here, so its real height pushes everything down and the
+  /* The banner is part of the page flow here, so its real height pushes everything down and the
      relatively positioned navigation never gets an offset that could cover a control. */
-.build-banner {
+  .build-banner {
     position: static;
   }
 
-.app-shell.has-banner {
+  .app-shell.has-banner {
     padding-top: 0;
   }
 
-.app-shell.has-banner .sidebar {
+  .app-shell.has-banner .sidebar {
     top: 0;
   }
 }
 
 @media (min-width: 701px) and (max-width: 1023px) {
-.app-shell {
+  .app-shell {
     --banner-h: 52px;
   }
 }
 
 @media (min-width: 1024px) {
-.app-shell.has-banner .sidebar {
+  .app-shell.has-banner .sidebar {
     height: calc(100vh - var(--banner-h));
   }
 
-.app-shell.has-banner.is-workspace .main-shell {
+  .app-shell.has-banner.is-workspace .main-shell {
     height: calc(100vh - var(--banner-h));
   }
 }
@@ -477,4 +467,24 @@
 
 .build-banner > span {
   flex: 1 1 auto;
+}
+
+@media (min-width: 701px) {
+  /* Must follow ".report-prose > :first-child" (pages/workspace.css). */
+  .is-workspace .brand {
+    justify-content: center;
+    margin-bottom: 14px;
+  }
+}
+
+/* Must follow ".notice button" (controls.css). */
+.build-banner button {
+  min-height: 32px;
+  flex: none;
+  padding: 4px 12px;
+}
+
+/* Must follow ".is-workspace main#main" (layout.css). */
+main#main[data-page='jobs'] {
+  padding-top: 16px;
 }

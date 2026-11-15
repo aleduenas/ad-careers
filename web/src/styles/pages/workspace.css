@@ -1,28 +1,9 @@
 /* The workspace page. */
 
-/* Kept in this file, not in controls.css, to hold its place relative to ".ws .doc-pane, .ws .workspace-section, .ws-panel .". */
 .pane-tabs [aria-selected='true'] {
   border-color: var(--green);
   color: var(--green);
   font-weight: 700;
-}
-
-/* Kept in this file, not in controls.css, to hold its place relative to ".pane-tabs [aria-selected='true']". */
-.ws .doc-pane,
-.ws .workspace-section,
-.ws-panel .edit-card {
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
-}
-
-/* Kept in this file, not in components/QuickMoves.css, to hold its place relative to ".pane-tabs [aria-selected='true']". */
-.quick-move-reject:hover:not(:disabled),
-.quick-move-reject.is-confirming {
-  background: var(--red);
-  color: var(--paper);
 }
 
 /* The workspace page. */
@@ -68,11 +49,11 @@
 }
 
 @media (max-width: 1023px) {
-.pane-tabs {
+  .pane-tabs {
     display: flex;
   }
 
-.doc-pane[data-active='false'] {
+  .doc-pane[data-active='false'] {
     display: none;
   }
 }
@@ -90,10 +71,6 @@
   display: grid;
   grid-template-columns: minmax(0, 1fr);
   gap: 18px;
-}
-
-.edit-card h3 {
-  margin: 0 0 10px;
 }
 
 .edit-row {
@@ -154,7 +131,7 @@
 }
 
 @media (min-width: 1024px) {
-.edit-grid-outer {
+  .edit-grid-outer {
     grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
     align-items: start;
   }
@@ -181,6 +158,10 @@
   display: grid;
   align-content: start;
   gap: 6px;
+}
+
+.action-item .quiet-button {
+  width: 100%;
 }
 
 .action-reason {
@@ -227,16 +208,6 @@
   display: inline-flex;
   min-height: 32px;
   align-items: center;
-}
-
-.report-prose > :first-child {
-  margin-top: 0;
-}
-
-.report-prose a {
-  color: var(--green);
-  text-decoration: underline;
-  text-underline-offset: 3px;
 }
 
 .action-bar {
@@ -429,7 +400,7 @@
 }
 
 @media (min-width: 1024px) {
-.workspace.ws {
+  .workspace.ws {
     display: flex;
     min-height: 0;
     flex: 1;
@@ -437,39 +408,39 @@
     gap: 0;
   }
 
-.ws-body {
+  .ws-body {
     display: flex;
     min-height: 0;
     flex: 1;
   }
 
-.ws-center {
+  .ws-center {
     display: flex;
     min-height: 0;
     flex: 1;
     flex-direction: column;
   }
 
-.ws-split {
+  .ws-split {
     display: flex;
     min-height: 0;
     flex: 1;
   }
 
-.ws-split > .doc-pane {
+  .ws-split > .doc-pane {
     min-width: 0;
     overflow: auto;
   }
 
-.ws-split > .doc-pane:first-child {
+  .ws-split > .doc-pane:first-child {
     flex: 0 0 calc(var(--ws-left, 50%) - 4px);
   }
 
-.ws-split > .doc-pane:last-child {
+  .ws-split > .doc-pane:last-child {
     flex: 1 1 0;
   }
 
-.ws-divider {
+  .ws-divider {
     display: block;
     flex: 0 0 8px;
     cursor: col-resize;
@@ -477,12 +448,12 @@
     touch-action: none;
   }
 
-.ws-divider:hover,
+  .ws-divider:hover,
   .ws-divider:focus-visible {
     background: var(--green);
   }
 
-.ws-rail {
+  .ws-rail {
     flex: 0 0 68px;
     flex-direction: column;
     flex-wrap: nowrap;
@@ -493,7 +464,7 @@
     background: var(--paper);
   }
 
-.ws-rail-button {
+  .ws-rail-button {
     flex-direction: column;
     gap: 2px;
     padding: 8px 2px;
@@ -502,12 +473,12 @@
 }
 
 @media (max-width: 1023px) {
-/* Below 1024 px the tool rail is a bar fixed to the bottom of the viewport. */
-.workspace.ws {
+  /* Below 1024 px the tool rail is a bar fixed to the bottom of the viewport. */
+  .workspace.ws {
     padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
   }
 
-.ws-rail {
+  .ws-rail {
     position: fixed;
     z-index: 30;
     right: 0;
@@ -521,7 +492,7 @@
     background: var(--paper);
   }
 
-.ws-rail-button {
+  .ws-rail-button {
     min-width: 0;
     flex: 1 1 0;
     justify-content: center;
@@ -530,7 +501,7 @@
 }
 
 @media (min-width: 701px) and (max-width: 1023px) {
-.ws-rail {
+  .ws-rail {
     left: 56px;
   }
 }
@@ -578,7 +549,7 @@
 }
 
 @media (min-width: 1024px) {
-.ws-split {
+  .ws-split {
     width: 100%;
     max-width: var(--content-max);
     margin-inline: auto;
@@ -586,7 +557,7 @@
     --pane-pad: 28px;
   }
 
-.ws-rail {
+  .ws-rail {
     padding-right: 6px;
     padding-left: 6px;
   }
@@ -613,32 +584,32 @@
 }
 
 @media (min-width: 1024px) {
-.ws-split {
+  .ws-split {
     max-width: var(--content-max);
     margin-inline: auto;
     padding: 16px 0;
   }
 
-.ws-split > .doc-pane {
+  .ws-split > .doc-pane {
     margin: 0;
   }
 
-.ws-split > .doc-pane:first-child {
+  .ws-split > .doc-pane:first-child {
     flex: 0 0 calc(var(--ws-left, 50%) - 4px - var(--gutter));
     margin-left: var(--gutter);
   }
 
-.ws-split > .doc-pane:last-child {
+  .ws-split > .doc-pane:last-child {
     flex: 1 1 0;
     margin-right: var(--gutter);
   }
 
-.ws-divider {
+  .ws-divider {
     background: transparent;
     position: relative;
   }
 
-.ws-divider::after {
+  .ws-divider::after {
     content: '';
     position: absolute;
     inset: 0 3px;
@@ -646,7 +617,7 @@
     background: var(--line);
   }
 
-.ws-divider:hover::after,
+  .ws-divider:hover::after,
   .ws-divider:focus-visible::after {
     background: var(--green);
   }
@@ -667,19 +638,19 @@
 }
 
 @media (min-width: 1024px) {
-.ws-split {
+  .ws-split {
     padding: 0;
   }
 
-.ws-split > .doc-pane {
+  .ws-split > .doc-pane {
     margin: 0;
   }
 
-.ws-split > .doc-pane:first-child {
+  .ws-split > .doc-pane:first-child {
     margin-left: var(--gutter);
   }
 
-.ws-split > .doc-pane:last-child {
+  .ws-split > .doc-pane:last-child {
     margin-right: var(--gutter);
   }
 }
@@ -807,7 +778,7 @@
 }
 
 @media (max-width: 600px) {
-.letter-modal {
+  .letter-modal {
     top: 0;
     left: 0;
     width: 100vw;
@@ -819,7 +790,7 @@
     border-radius: 0;
   }
 
-.letter-modal .doc-edit {
+  .letter-modal .doc-edit {
     min-height: 50dvh;
     flex: 1 1 auto;
   }

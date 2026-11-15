@@ -1,13 +1,13 @@
 /* Shared controls and surfaces used by more than one page: buttons, notices, tables, forms, chips. */
 
-/* Kept in this file, not in pages/jobs.css, to hold its place relative to ".edit-card label". */
-.search-control,
-.jobs-controls > label {
-  display: grid;
-  gap: 5px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 650;
+.local-pip,
+.status-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: #358467;
 }
 
 /* Shared controls and surfaces used by more than one page: buttons, notices, tables, forms, chips. */
@@ -28,14 +28,6 @@
   font-size: 10px;
   font-weight: 750;
   letter-spacing: 1.1px;
-}
-
-.status-ok .status-dot {
-  background: #358467;
-}
-
-.status-error .status-dot {
-  background: var(--red);
 }
 
 .capability-card {
@@ -82,59 +74,6 @@
 .section-heading p {
   margin-top: 3px;
   font-size: 12px;
-}
-
-.status-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px;
-}
-
-.status-card {
-  display: grid;
-  min-width: 0;
-  min-height: 105px;
-  grid-template-columns: 10px minmax(0, 1fr);
-  align-content: center;
-  align-items: start;
-  column-gap: 10px;
-  row-gap: 4px;
-  padding: 17px;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  background: var(--paper);
-  box-shadow: 0 2px 7px #192e2510;
-}
-
-.status-card .spinner,
-.status-card .status-dot {
-  grid-row: 1 / span 3;
-  margin-top: 4px;
-}
-
-.status-card strong {
-  font-size: 13px;
-}
-
-.status-card > span:not(.spinner, .status-dot),
-.status-card small {
-  min-width: 0;
-  overflow-wrap: anywhere;
-  color: var(--muted);
-  font-size: 11px;
-}
-
-.status-card small {
-  font-family: ui-monospace, Consolas, monospace;
-}
-
-.status-error {
-  border-color: #e7cdce;
-  background: color-mix(in srgb, var(--red-bg) 35%, var(--paper));
-}
-
-.status-ok {
-  border-color: #d4e5da;
 }
 
 .spinner {
@@ -203,14 +142,6 @@
   font-weight: 650;
 }
 
-dialog::backdrop {
-  position: fixed;
-  z-index: 50;
-  inset: 0;
-  background: #10171499;
-  backdrop-filter: blur(2px);
-}
-
 .dialog {
   position: fixed;
   z-index: 51;
@@ -274,15 +205,6 @@ dialog.dialog:not([open]) {
   text-align: right;
 }
 
-:root[data-theme='dark'] .status-error {
-  border-color: #744047;
-  background: color-mix(in srgb, var(--red-bg) 45%, var(--paper));
-}
-
-:root[data-theme='dark'] .status-ok {
-  border-color: #365d48;
-}
-
 :root[data-theme='dark'] .primary-button {
   border-color: #78c99d;
   background: #276c50;
@@ -294,45 +216,30 @@ dialog.dialog:not([open]) {
   background: #31805f;
 }
 
-@media (max-width: 1100px) {
-.status-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 700px) {
-.capability-card {
+  .capability-card {
     align-items: flex-start;
     flex-direction: column;
     gap: 15px;
     padding: 18px;
   }
 
-.section-heading {
+  .section-heading {
     align-items: flex-start;
   }
 
-.status-grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
-  }
-
-.status-card {
-    min-height: 88px;
-  }
-
-.notice {
+  .notice {
     align-items: flex-start;
     flex-direction: column;
     gap: 12px;
     padding: 14px;
   }
 
-.notice button {
+  .notice button {
     align-self: flex-start;
   }
 
-.dialog {
+  .dialog {
     padding: 21px 18px;
   }
 }
@@ -367,18 +274,6 @@ dialog.dialog:not([open]) {
   font-size: 12px;
 }
 
-.status-counts,
-.bucket-list,
-.weekly-list {
-  display: grid;
-  gap: 0;
-}
-
-.jobs-toolbar h2 {
-  margin: 0;
-  font-size: 20px;
-}
-
 .checkbox-control input {
   width: 17px;
   height: 17px;
@@ -395,37 +290,15 @@ dialog.dialog:not([open]) {
   scrollbar-width: thin;
 }
 
-.jobs-table th,
-.jobs-table td {
-  max-width: 280px;
-  padding: 10px 11px;
-  border-bottom: 1px solid var(--line);
-  vertical-align: top;
-}
-
-.job-status,
-.material-badge {
-  display: inline-flex;
-  align-items: center;
-  min-height: 22px;
-  padding: 2px 7px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--paper-soft);
-  font-size: 10px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
-.status-interview,
-.status-offer,
-.status-applied {
+.job-status.status-interview,
+.job-status.status-offer,
+.job-status.status-applied {
   border-color: color-mix(in srgb, var(--green) 40%, var(--line));
   background: var(--green-bg);
 }
 
-.status-rejected,
-.status-discarded {
+.job-status.status-rejected,
+.job-status.status-discarded {
   border-color: color-mix(in srgb, var(--red) 30%, var(--line));
   background: var(--red-bg);
 }
@@ -521,11 +394,11 @@ dialog.dialog:not([open]) {
 }
 
 @media (max-width: 700px) {
-.history-table {
+  .history-table {
     min-width: 0;
   }
 
-.history-table th,
+  .history-table th,
   .history-table td {
     padding: 8px 8px;
   }
@@ -591,12 +464,12 @@ dialog.dialog:not([open]) {
 }
 
 @media (max-width: 700px) {
-.history-table th,
+  .history-table th,
   .history-table td {
     overflow-wrap: break-word;
   }
 
-.history-table th {
+  .history-table th {
     white-space: nowrap;
   }
 }
@@ -642,19 +515,12 @@ dialog.dialog:not([open]) {
   gap: 12px;
 }
 
-.readiness-help code {
-  padding: 1px 6px;
-  border-radius: 6px;
-  background: var(--paper-soft);
-  font-size: 12px;
-}
-
 @media (max-width: 700px) {
-.provider-fields {
+  .provider-fields {
     grid-template-columns: minmax(0, 1fr);
   }
 
-.provider-fields .primary-button {
+  .provider-fields .primary-button {
     width: 100%;
   }
 }
@@ -702,44 +568,19 @@ dialog.dialog:not([open]) {
 }
 
 @media (max-width: 1100px) {
-.col-minor {
+  .col-minor {
     display: none;
   }
 }
 
-fieldset legend {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.status-chips {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin: 0 0 12px;
-}
-
-.status-chip {
-  min-height: 32px;
-  padding: 4px 12px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: var(--paper);
-  color: var(--ink);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.status-chip:hover {
-  background: var(--paper-soft);
-}
-
-.status-chip[aria-pressed='true'] {
-  border-color: var(--green);
-  background: var(--green-bg);
-  color: var(--green);
-  font-weight: 700;
+.ws .doc-pane,
+.ws .workspace-section,
+.ws-panel .edit-card {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
 }
 
 .ws .doc-text,
@@ -777,39 +618,62 @@ fieldset legend {
 }
 
 @media (max-width: 1023px) {
-.app-shell.has-banner .ws .doc-pane > h3 {
+  .app-shell.has-banner .ws .doc-pane > h3 {
     top: var(--banner-h);
   }
 }
 
-.status-chips {
+.quick-move {
+  min-height: 30px;
+  padding: 3px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.quick-move-reject {
+  border-color: var(--red);
+  background: var(--red-bg);
+  color: var(--red);
+}
+
+/* The jobs page. */
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin: 20px -25px -25px;
+  padding: 15px 25px;
+  border-top: 1px solid var(--line);
+  background: var(--paper-soft);
+}
+
+@media (max-width: 700px) {
+  .dialog-actions {
+    margin: 18px -18px -21px;
+    padding: 13px 18px;
+  }
+
+  .dialog-actions button {
+    flex: 1;
+    padding-right: 8px;
+    padding-left: 8px;
+    font-size: 12px;
+  }
+}
+
+.empty-state h3,
+.empty-state p {
   margin: 0;
 }
 
-/* Kept in this file, not in pages/jobs.css, to hold its place relative to ".dialog dl > div:last-child". */
-.jobs-table tbody tr:last-child > * {
-  border-bottom: 0;
+.file-list span {
+  color: var(--muted);
+  font-size: 12px;
 }
 
-/* Kept in this file, not in pages/jobs.css, to hold its place relative to ".file-list strong, .file-list span". */
-.job-name strong,
-.job-name span,
-.compensation-cell span,
-.compensation-cell small,
-.date-cell span {
-  display: block;
-}
-
-/* Kept in this file, not in pages/jobs.css, to hold its place relative to ".empty-state h3". */
-.job-group h3 {
-  margin: 0 0 8px;
-  color: var(--green);
-  font-size: 14px;
-}
-
-/* Kept in this file, not in pages/service.css, to hold its place relative to ".panel-card .section-heading". */
-.connection-summary > .section-heading {
-  margin-bottom: 14px;
+.edit-card h3 {
+  margin: 0 0 10px;
 }
 
 /* Order-bound rules. Each rule here targets the same element and specificity as an earlier rule in another file (or
@@ -835,4 +699,12 @@ fieldset legend {
 .file-list span {
   display: block;
   overflow-wrap: anywhere;
+}
+
+/* Must follow ".provider-row, .readiness-row" (pages/providers.css). */
+.readiness-notLoggedIn,
+.readiness-unavailable {
+  border-color: var(--red);
+  background: var(--red-bg);
+  color: var(--red);
 }

@@ -70,10 +70,6 @@
   max-width: 140px;
 }
 
-.batch-actions {
-  margin-top: 20px;
-}
-
 .batch-status {
   align-items: flex-start;
 }
@@ -87,11 +83,6 @@
   display: grid;
   gap: 6px;
   min-width: 0;
-}
-
-.batch-status-body p {
-  margin: 0;
-  font-size: 12px;
 }
 
 .batch-status-actions {
@@ -116,20 +107,20 @@
 }
 
 @media (max-width: 700px) {
-.batch-bar {
+  .batch-bar {
     align-items: stretch;
   }
 
-.batch-buttons button {
+  .batch-buttons button {
     flex: 1 1 130px;
   }
 
-.batch-status {
+  .batch-status {
     flex-direction: column;
     align-items: stretch;
   }
 
-.batch-status-actions button {
+  .batch-status-actions button {
     flex: 1 1 120px;
   }
 }

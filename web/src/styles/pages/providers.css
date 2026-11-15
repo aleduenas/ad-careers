@@ -1,5 +1,12 @@
 /* The providers page. */
 
+.readiness-help code {
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--paper-soft);
+  font-size: 12px;
+}
+
 /* The providers page. */
 /* Package 3.7: Providers page */
 .providers-page {
@@ -59,15 +66,6 @@
 .providers-page h2,
 .providers-page h3 {
   margin: 0;
-}
-
-/* Kept in this file, not in controls.css, to hold its place relative to ".source-badge, .readiness-badge". */
-/* Must follow ".provider-row, .readiness-row" (pages/providers.css). */
-.readiness-notLoggedIn,
-.readiness-unavailable {
-  border-color: var(--red);
-  background: var(--red-bg);
-  color: var(--red);
 }
 
 /* Must follow ".source-badge, .readiness-badge" (pages/providers.css). */

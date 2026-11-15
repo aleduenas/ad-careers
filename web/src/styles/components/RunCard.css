@@ -36,53 +36,6 @@
   overflow-wrap: anywhere;
 }
 
-/* A run that stopped on the location gate: the saved reason and the two answers. */
-.location-review {
-  display: grid;
-  gap: 8px;
-  margin-top: 6px;
-}
-
-.location-reason {
-  margin: 0;
-  color: var(--orange);
-  font-size: 13px;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
-}
-
-.location-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.location-note {
-  margin: 0;
-  color: var(--muted);
-  font-size: 12px;
-}
-
-.location-review-block {
-  /* The same side margins as the header content above it. */
-  margin: 0 max(var(--gutter), calc((100% - var(--content-max)) / 2)) 12px;
-  padding: 10px 12px;
-  border: 1px solid var(--orange);
-  border-radius: 9px;
-  background: var(--orange-bg);
-}
-
-.location-review-block h4 {
-  margin: 0;
-  color: var(--orange);
-  font-size: 13px;
-}
-
-/* Kept in this file, not in pages/workspace.css, to hold its place relative to ".run-card .quiet-button". */
-.action-item .quiet-button {
-  width: 100%;
-}
-
 /* Must follow ".action-item .quiet-button" (pages/workspace.css). */
 .run-card .quiet-button {
   width: fit-content;

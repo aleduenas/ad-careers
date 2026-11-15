@@ -1,5 +1,6 @@
 /* The tasks page. */
 
+/* Failed-task text is red at every width; the narrow layout repeats it below. */
 .task-extra-error {
   color: var(--red);
 }
@@ -107,11 +108,15 @@
 }
 
 @media (max-width: 1100px) {
-.tasks-table {
+  .task-extra-error {
+    color: var(--red);
+  }
+
+  .tasks-table {
     min-width: 0;
   }
 
-.tasks-table tbody th {
+  .tasks-table tbody th {
     white-space: normal;
   }
 }
