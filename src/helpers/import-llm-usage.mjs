@@ -4,6 +4,8 @@
 // Usage:
 //   node src/helpers/import-llm-usage.mjs            # dry run: counts by provider and function
 //   node src/helpers/import-llm-usage.mjs --apply    # insert the rows (source = backfill)
+//   node src/helpers/import-llm-usage.mjs --estimate-drafting [--since=2026-11-06] [--apply]
+//                                          # estimate past CV/letter runs (source = estimate)
 //
 // Reads logs/evaluation/**/*.stdout.log and logs/drafting/runs/**/*-usage.json. Idempotent: the
 // log path is the log_ref and llm_calls.log_ref is unique, so a rerun inserts nothing new.
@@ -12,6 +14,12 @@ import { basename, dirname, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { root as defaultRoot } from '../lib/root.mjs';
 import { logRefOf, parseUsage, recordCall } from '../lib/_llm-usage.mjs';
+import {
+  DEFAULT_SINCE,
+  ESTIMATE_CONSTANTS,
+  planEstimates,
+  summarizeEstimates,
+} from '../lib/_llm-estimate.mjs';
 
 function walk(dir, accept, out = []) {
   if (!existsSync(dir)) return out;
@@ -144,7 +152,81 @@ export async function applyRepairs(repairs, { query } = {}) {
   return repaired;
 }
 
+// Estimates for past drafting runs that kept no usage (D093). Dry run unless apply.
+async function estimateMain(apply, since) {
+  const { query, close } = await import('../lib/_database.mjs');
+  let measured = [];
+  let claudeModels = [];
+  const jobsByUrl = new Map();
+  let existingRefs = new Set();
+  let note = null;
+  try {
+    measured = (
+      await query(
+        "SELECT log_ref, called_at FROM llm_calls WHERE function IN ('cv','coverLetter') AND source <> 'estimate'",
+      )
+    ).map(r => ({ logRef: r.log_ref, calledAt: new Date(r.called_at).toISOString() }));
+    claudeModels = (
+      await query(
+        "SELECT model, called_at FROM llm_calls WHERE provider='claude' AND model LIKE 'claude-sonnet%' AND source <> 'estimate'",
+      )
+    ).map(r => ({ model: r.model, at: new Date(r.called_at).getTime() }));
+    existingRefs = new Set(
+      (await query("SELECT log_ref FROM llm_calls WHERE source='estimate'")).map(r => r.log_ref),
+    );
+    for (const r of await query('SELECT id::text AS id, url FROM jobs WHERE url IS NOT NULL')) {
+      if (!jobsByUrl.has(r.url)) jobsByUrl.set(r.url, []);
+      jobsByUrl.get(r.url).push(r.id);
+    }
+  } catch (error) {
+    if (apply) throw error;
+    note =
+      'Database not consulted (' +
+      (error.code || error.message) +
+      '); no measured rows, job links or model timeline were available.';
+  }
+  try {
+    const plan = planEstimates(defaultRoot, { measured, claudeModels, jobsByUrl, existingRefs });
+    const stored = [];
+    const storedPlain = [];
+    const before = [];
+    const beforePlain = [];
+    plan.rows.forEach((r, i) => {
+      (r.runDate >= since ? stored : before).push(r);
+      (r.runDate >= since ? storedPlain : beforePlain).push(plan.plain[i]);
+    });
+    const report = {
+      mode: apply ? 'apply' : 'dry-run',
+      since,
+      constants: ESTIMATE_CONSTANTS,
+      skippedRuns: plan.skipped,
+      assumptions: plan.assumptions,
+      stored: {
+        callsToStore: stored.length,
+        linkedToAJob: stored.filter(r => r.jobId != null).length,
+        byMonthFunctionProvider: summarizeEstimates(stored, storedPlain),
+      },
+      notStoredBeforeCutoff: {
+        calls: before.length,
+        byMonthFunctionProvider: summarizeEstimates(before, beforePlain),
+      },
+      ...(note ? { note } : {}),
+    };
+    // Runs before the cutoff are reported only, whatever the flags.
+    if (apply) report.result = await applyBackfill(stored);
+    console.log(JSON.stringify(report, null, 2));
+  } finally {
+    await close();
+  }
+}
+
 async function main() {
+  if (process.argv.includes('--estimate-drafting')) {
+    const flag = process.argv.find(a => a.startsWith('--since='));
+    const since = flag ? flag.slice(8) : DEFAULT_SINCE;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(since)) throw new Error('--since needs YYYY-MM-DD');
+    return estimateMain(process.argv.includes('--apply'), since);
+  }
   const apply = process.argv.includes('--apply');
   const { query, close } = await import('../lib/_database.mjs');
   let existing = null;

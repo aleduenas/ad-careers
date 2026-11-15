@@ -9,9 +9,9 @@ the same counts with `src/lib/llm-prices.mjs`. `createCostService({ reader, pric
 (`createCostReader`) calls `cubeCalls`, `readCalls` and `countCalls` from `src/lib/_llm-usage.mjs`;
 tests inject a reader with `cube`, `calls` and `count`.
 
-**Routes** (registered in `app.mjs`, outside the write guard): `GET /api/v1/cost/summary?range=` and
-`GET /api/v1/cost/calls?range=&jobId=&limit=`. `normalizeCostQuery` is strict: `range` is `7d`, `30d`
-(default), `90d` or `all`; `jobId` is a positive integer string; `limit` is 1 to 500 (default 100);
+**Routes** (registered in `app.mjs`, outside the write guard): `GET /api/v1/cost/summary?range=&estimates=` and
+`GET /api/v1/cost/calls?range=&jobId=&limit=&estimates=`. `normalizeCostQuery` is strict: `range` is `7d`, `30d`
+(default), `90d` or `all`; `jobId` is a positive integer string; `limit` is 1 to 500 (default 100); `estimates` is `include` (default) or `exclude`;
 anything else, a repeated key or an unknown key is 400 `INVALID_REQUEST` with the field named.
 
 **Summary:** the reader returns rows grouped by day, provider, model, function and job. The service
@@ -25,6 +25,13 @@ one, otherwise the table price, otherwise null. In the grouped summary each row'
 used for its reported calls and the table prices the row's `unreported` token sums (calls without a
 reported cost, supplied by `cubeCalls`). The Haiku long-prompt tier is chosen by average prompt per
 unreported call, and table prices use the 1-hour (Claude) cache-write rate.
+
+**Estimates (D093):** rows with source `estimate` (past drafting runs, tokens estimated from saved
+prompt and response sizes) are included unless `estimates=exclude`. The option is passed to every
+reader call (`cube`, `calls`, `count`), so the reader filters in SQL; the summary echoes `estimates`
+and every group carries `estimatedCalls` (the cube row's `estimatedCalls`, capped at its `calls`).
+Estimated rows carry no reported cost, so they are priced from the table through the `unreported`
+path like any unreported call. Calls show `source: 'estimate'`.
 
 **Partial groups:** every group carries `unpricedCalls`, the number of its calls with neither a
 reported cost nor a table price; `estimatedUsd` is a floor whenever it is above 0.

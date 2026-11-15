@@ -19,7 +19,7 @@ enforces it too). It calls `change_job_status(id, revision, status, reason, 'bro
 `salaryBand` with a field-value guard (`UPDATE ... WHERE id AND <col> IS NOT DISTINCT FROM
 expected`, revision bumped); zero rows is 404 for an unknown job and 409 `FIELD_CONFLICT`
 otherwise. Strings are control-stripped, trimmed, non-empty, at most 300 characters. A URL must be
-http(s) without credentials and sets `url_key` (`urlKey`) in the same statement; a unique violation
+http(s) without credentials after a `findJobByUrl` check (another job holding the URL under an older stored key is `URL_IN_USE`, own row excluded) and sets `url_key` (`urlKey`) in the same statement; a unique violation
 is 409 `URL_IN_USE`. Because the job DTO shows the URL normalized, the URL guard also accepts the
 stored `url_key` of the expected value. A salary band is `{min, max}` decimal strings with
 `0 <= min <= max` (compared exactly), guarded on both columns, or `null` to clear both. Notes are

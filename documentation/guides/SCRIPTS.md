@@ -31,6 +31,7 @@ detail (inputs, outputs, callers) is in `documentation/src/`.
 | `node src/helpers/verify-portals.mjs` | Portal configuration diagnostics and provider coverage. `npm run verify:portals` |
 | `node src/helpers/prune-reports.mjs <file...> \| --list` | Retire named report files into `data/evaluations/.trash/` (writes by default; use deliberately) |
 | `node src/helpers/prune-logs.mjs [--apply]` | Retention policy for `logs/` and `data/backups/` (dry-run default) |
+| `node src/helpers/import-llm-usage.mjs --estimate-drafting [--since=2026-11-06] [--apply]` | Estimate token usage of past CV and cover-letter runs that kept none (`source = estimate`; dry-run default; stores only runs on or after the cutoff, earlier ones are reported only; needs migration 012 to apply) |
 | `node src/helpers/import-llm-usage.mjs [--apply]` | Backfill `llm_calls` token records from `logs/evaluation` and `logs/drafting` (dry-run default; idempotent; also fills a missing `job_id` on already recorded rows, never overwriting one) |
 
 ## Analytics

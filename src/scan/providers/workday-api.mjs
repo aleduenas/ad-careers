@@ -56,6 +56,28 @@ async function resolveCountryFacetId(base, tenant, site, countryName, ctx) {
   return null;
 }
 
+// Workday list stubs show "3 Locations" instead of place names; that is unknown, not a location.
+function realLocation(value) {
+  const text = String(value ?? '').trim();
+  return /^\d+\s+locations?$/i.test(text) ? '' : text;
+}
+
+const RETRY_DELAYS_MS = [1500, 4000];
+function isTransient(err) {
+  return /HTTP 429|timed out/i.test(String(err?.message ?? err));
+}
+async function getDetail(ctx, url) {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await ctx.getJson(url);
+    } catch (err) {
+      if (!isTransient(err) || attempt >= RETRY_DELAYS_MS.length) throw err;
+      const wait = RETRY_DELAYS_MS[attempt];
+      await (ctx.sleep ? ctx.sleep(wait) : new Promise(resolve => setTimeout(resolve, wait)));
+    }
+  }
+}
+
 export default {
   id: 'workday',
 
@@ -113,44 +135,63 @@ export default {
       }
     }
 
-    // Fetch full detail (description) for each unique posting — bounded concurrency via ctx if available
+    // Fetch full detail (description) only for stubs that could survive the title, location and
+    // dedup filters. The URL is always `{base}/{site}{externalPath}` (what earlier scans stored),
+    // never jp.externalUrl, so it is the same with or without the detail fetch.
     const LIMIT = 5;
     const detailed = new Array(stubs.length);
+    let skipped = 0;
     let i = 0;
     async function worker() {
       while (i < stubs.length) {
         const idx = i++;
         const stub = stubs[idx];
+        const url = `${base}/${site}${stub.externalPath}`;
+        const stubLocation = realLocation(stub.locationsText);
+        const stubJob = {
+          title: stub.title,
+          url,
+          company: entry.name,
+          location: stubLocation,
+          content: null,
+        };
+        if (ctx.shouldFetchContent && !ctx.shouldFetchContent(stubJob)) {
+          detailed[idx] = stubJob;
+          continue;
+        }
         try {
-          const detail = await ctx.getJson(
+          const detail = await getDetail(
+            ctx,
             `${base}/wday/cxs/${tenant}/${site}${stub.externalPath}`,
           );
           const jp = detail.jobPostingInfo || {};
           detailed[idx] = {
             title: jp.title || stub.title,
-            url: jp.externalUrl || `${base}/${site}${stub.externalPath}`,
+            url,
             company: entry.name,
             location:
-              [...new Set([jp.location, ...(jp.additionalLocations || [])].filter(Boolean))].join(
-                '; ',
-              ) ||
-              stub.locationsText ||
-              '',
+              realLocation(
+                [...new Set([jp.location, ...(jp.additionalLocations || [])].filter(Boolean))].join(
+                  '; ',
+                ),
+              ) || stubLocation,
             content: htmlToText(jp.jobDescription) || null,
           };
-        } catch {
-          detailed[idx] = {
-            title: stub.title,
-            url: `${base}/${site}${stub.externalPath}`,
-            company: entry.name,
-            location: stub.locationsText || '',
-            content: null,
-          };
+        } catch (err) {
+          if (isTransient(err)) {
+            skipped++; // leave out: nothing recorded, the next scan retries it
+          } else {
+            detailed[idx] = stubJob;
+          }
         }
       }
     }
     await Promise.all(Array.from({ length: Math.min(LIMIT, stubs.length) }, worker));
+    if (skipped > 0)
+      console.log(
+        `workday: ${entry.name}: ${skipped} postings skipped this run (detail unavailable)`,
+      );
 
-    return detailed;
+    return detailed.filter(Boolean);
   },
 };

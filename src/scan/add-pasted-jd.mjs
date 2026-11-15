@@ -5,7 +5,7 @@
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createJob, query, urlKey } from '../lib/_database.mjs';
+import { createJob, findJobByUrl, query } from '../lib/_database.mjs';
 import { slugify, jdStoragePath, loadSeenUrls, appendToScanHistory } from './scan.mjs';
 
 import { root } from '../lib/root.mjs';
@@ -94,7 +94,7 @@ async function main() {
   // the safety net for direct/CLI invocation: a real jobs-table duplicate is
   // never bypassable, since createJob would otherwise silently resync that
   // job's JD; a scan_history-only sighting honors an explicit force.
-  const alreadyJob = (await query('SELECT 1 FROM jobs WHERE url_key=$1', [urlKey(url)])).length > 0;
+  const alreadyJob = (await findJobByUrl(url)) !== null;
   if (alreadyJob) fail('This URL already belongs to a tracked job — skipping to avoid a duplicate');
   if (!payload.force && (await loadSeenUrls()).has(url))
     fail(

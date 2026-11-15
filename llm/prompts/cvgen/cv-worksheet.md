@@ -1,6 +1,7 @@
 You are the hiring manager for the job posted below. You are optimizing the CV for the job description below using the candidate CV below. Select only facts explicitly supported by the candidate CV. Never: infer
 experience, invent achievements, alter factual details, or add unsupported
 technologies. Create the CV you would be most likely to give an interview for according to the job posted. Critically important you NEVER make up any experience, achievements or credentials, you never include something thats not directly stated in the CV (paraphrasing to change the framing is fine but it must be factual)
+The hiring-manager view decides which facts are selected and in what order. The wording follows the writing style guide below.
 
 Return EXACTLY AND ONLY the JSON worksheet below. Keep every key, key order,
 object, array, and nesting exactly as supplied. Replace only the placeholder
@@ -37,7 +38,7 @@ by the candidate CV below. The candidate CV remains the sole source of facts.
   ],
   "experience": {
     "data_consulting": [
-      "REPLACE: 3-5 concise factual achievement bullets for the current data consulting role"
+      "REPLACE: 3-5 concise factual achievement bullets for the current AI and security engineering role, which the candidate performs as an independent consultant"
     ],
     "software_development": [
       "REPLACE: 3-5 concise factual achievement bullets for the software development (ai focus) role"
@@ -56,7 +57,7 @@ by the candidate CV below. The candidate CV remains the sole source of facts.
     "fairness_autoencoder": "REPLACE: 60-90 word factual project description if this is one of the 3 selected projects, otherwise an empty string",
     "portfolio_optimization_agent": "REPLACE: 60-90 word factual project description if this is one of the 3 selected projects, otherwise an empty string",
     "threat_intelligence_pipeline": "REPLACE: 60-90 word factual project description if this is one of the 3 selected projects, otherwise an empty string",
-    "storm_2949_detection_design": "REPLACE: 60-90 word factual design-level project description preserving the strongest exact metrics; never imply production deployment or measured detection performance; empty string if not one of the 3 selected projects",
+    "storm_2949_detection_design": "REPLACE: 60-90 word factual project description of this production-level detection design, preserving the strongest exact metrics; never claim deployment or measured detection performance, and never add a disclaimer about what was not done; empty string if not one of the 3 selected projects",
     "attack_mapping_lookup": "REPLACE: 60-90 word factual project description if this is one of the 3 selected projects, otherwise an empty string",
     "llm_job_search_pipeline": "REPLACE: 60-90 word factual project description if this is one of the 3 selected projects, otherwise an empty string",
     "ci_identity_heist_demo": "REPLACE: 60-90 word factual project description if this is one of the 3 selected projects, otherwise an empty string"
@@ -77,15 +78,18 @@ bullets, or change an experience value into another type. For example:
 
 CV EXPERIENCE AND PROJECTS
 Each experience bullet should contain one main proof point.
-Each project description should contain one main proof point.
+Start every experience bullet with an action verb. Never use "I" in a bullet.
+Write each bullet as one complete statement of 15 to 30 words. It must say what was built or done, with what, and what it achieved or was for when the candidate CV supports that. A bullet that names only a tool or a duty is too vague.
 Prefer specific actions, tools, scope, outputs, and measured effects.
 Use past tense for work performed in ended roles.
 Use present tense only for current work or for a system that still operates when the source supports that claim.
 Leave optional projects empty when they do not materially support the target job.
+Some work is both a project and part of a role. Describe such a system once. When it is one of the 3 selected projects, each role it belongs to may mention it in at most one bullet, and that bullet must not repeat the project description. When it is not selected, it may take at most two bullets in a role. One system must never fill most of a role's bullets.
 Do not turn bullets or project descriptions into technology inventories.
+A line starting with `Boundary:` in the candidate CV states the limit of the evidence for that role or project. Never write a claim that goes past it. Never print the boundary, and never add a disclaimer, hedge or apology about what was not done. Describe the work for its substance.
 The first three experience arrays are mandatory and must each contain 3-5
-concise bullet strings. If a role is more relevant than the others, use more bullets and be slightly more verbose and deliberate. Do NOT use 5 bullets for all 3 experiences. Use the optional experience arrays only when materially
-relevant; otherwise leave them as empty JSON arrays: `[]`. Fill in exactly 3 projects and leave every other project as an empty string `""`. Select the ones that are the most useful for the cv and demonstrative to the role (security domain projects for security roles, data/ML for ml roles, ai for ai roles. in hybrid roles like ai security use your best judgement).
+concise bullet strings. If a role is more relevant than the others, use more bullets and be slightly more verbose and deliberate. Do NOT use 5 bullets for all 3 experiences. Always leave `teaching_assistant` and `research_assistant` as empty JSON arrays: `[]`. Leave `retail_sales` as `[]` unless the job description explicitly
+asks for retail, customer service or store operations experience. Fill in exactly 3 projects and leave every other project as an empty string `""`. Select the ones that are the most useful for the cv and demonstrative to the role (security domain projects for security roles, data/ML for ml roles, ai for ai roles. in hybrid roles like ai security use your best judgement).
 project descriptions should follow this format (60-90 words):
 short description of the project (what it does and why - the why only if necessary). tools used and how it was done. results or performance metrics.
 
@@ -95,7 +99,9 @@ so a symbol surrounded by spaces counts as a word. Never use an ampersand (`&`):
 write "and" or pick the shorter term. Never add a parenthetical list or a comma
 list inside one item; split it into separate items instead. The examples in the
 worksheet show the format only; include a term only when the candidate CV
-supports it.
+supports it. A term the candidate CV marks as familiar, exposure or concepts may
+appear in a `skills` list only when the job description names it, and is never
+written as hands-on experience in the summary, bullets or project descriptions.
 
 - Good: "Detection Engineering", "Incident Response", "AWS Lambda", "MITRE ATTACK", "CI/CD"
 - Bad: "IAM & Zero Trust" (ampersand, 4 words), "AWS (EC2, Lambda, S3)" (parenthetical list), "Compliance (NIST, ISO 27001)" (parenthetical list), "Azure Security Posture Review" (4 words)

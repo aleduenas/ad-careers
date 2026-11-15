@@ -885,7 +885,14 @@ const costGroup = extra => ({
   required: [...Object.keys(extra), ...costTokenRequired],
   // unpricedCalls: calls in this group with neither a reported cost nor a table price, so
   // estimatedUsd is a floor when it is above zero. Optional for older servers.
-  properties: { ...extra, ...costTokenFields, unpricedCalls: { type: 'integer', minimum: 0 } },
+  // estimatedCalls (D093): calls in this group whose tokens are estimates (source 'estimate'),
+  // not measurements. Optional for older servers.
+  properties: {
+    ...extra,
+    ...costTokenFields,
+    unpricedCalls: { type: 'integer', minimum: 0 },
+    estimatedCalls: { type: 'integer', minimum: 0 },
+  },
 });
 const costRange = { type: 'string', enum: ['7d', '30d', '90d', 'all'] };
 const costSummaryData = {
@@ -952,6 +959,8 @@ const costSummaryData = {
       },
     },
     unpriced: { type: 'array', items: { type: 'string' } },
+    // D093: whether estimated rows are included in every figure of this response.
+    estimates: { type: 'string', enum: ['include', 'exclude'] },
   },
 };
 const costCall = {
@@ -990,7 +999,7 @@ const costCall = {
     reasoningTokens: { type: 'integer', minimum: 0 },
     totalTokens: { type: 'integer', minimum: 0 },
     durationMs: { anyOf: [{ type: 'integer', minimum: 0 }, { type: 'null' }] },
-    source: { type: 'string', enum: ['live', 'backfill'] },
+    source: { type: 'string', enum: ['live', 'backfill', 'estimate'] },
     estimatedUsd: { anyOf: [{ type: 'number', minimum: 0 }, { type: 'null' }] },
   },
 };

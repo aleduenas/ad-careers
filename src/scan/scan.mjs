@@ -177,17 +177,31 @@ export function resolveProvider(entry, providers) {
 // ── Title filter ────────────────────────────────────────────────────
 
 export function buildTitleFilter(titleFilter, additionalPositive = []) {
-  const positive = [...(titleFilter?.positive || []), ...additionalPositive].map(k =>
-    k.toLowerCase(),
+  const positive = [...(titleFilter?.positive || []), ...additionalPositive].map(
+    buildPositiveMatcher,
   );
   const negative = (titleFilter?.negative || []).map(buildNegativeMatcher);
 
   return title => {
     const lower = title.toLowerCase();
-    const hasPositive = positive.length === 0 || positive.some(k => lower.includes(k));
+    const hasPositive = positive.length === 0 || positive.some(matcher => matcher(lower));
     const hasNegative = negative.some(matcher => matcher(lower));
     return hasPositive && !hasNegative;
   };
+}
+
+// A positive keyword that starts with a letter or digit must begin at a word boundary, so
+// "IT Risk" no longer hits "Credit Risk" (and "Security" no longer hits "Cybersecurity").
+// Short letter/digit keywords ("AI", "ML", "ETL", "GRC", up to 4 characters) must also end at a
+// word boundary, so "ETL" no longer hits "Settlement". Longer keywords may be followed by
+// anything ("Data Engineer" still matches "Data Engineers").
+function buildPositiveMatcher(keyword) {
+  const lowered = String(keyword).toLowerCase();
+  if (!/^[a-z0-9]/.test(lowered)) return lower => lower.includes(lowered);
+  const escaped = lowered.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const tail = /^[a-z0-9]{1,4}$/.test(lowered) ? '(?![a-z0-9])' : '';
+  const re = new RegExp(`(?<![a-z0-9])${escaped}${tail}`);
+  return lower => re.test(lower);
 }
 
 // Word-boundary matching for alphanumeric keywords (e.g. "Lead") so a bare
@@ -244,13 +258,33 @@ export async function loadSeenUrls() {
   };
   return seen;
 }
+// Company-role dedup key: lower case, punctuation and repeated whitespace collapsed, a trailing
+// bracketed requisition tag removed from the title ("(5440)", "(ATH 5531)") and a trailing legal
+// suffix removed from the company. Different names are never fuzzy-matched (TD vs TD Bank).
+const COMPANY_SUFFIX = /\s+(inc|ltd|corp|corporation|llc|ulc)$/;
+function squash(value) {
+  return String(value ?? '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim();
+}
+export function companyRoleKey(company, title) {
+  let t = String(title ?? '');
+  for (;;) {
+    // Only requisition tags: digits alone "(5440)", or an upper-case code plus 3+ digits "(ATH 5531)".
+    const next = t.replace(/\s*[([]\s*(?:\d+|[A-Z]+[\s-]*\d{3,})\s*[)\]]\s*$/, '');
+    if (next === t) break;
+    t = next;
+  }
+  return `${squash(company).replace(COMPANY_SUFFIX, '')}::${squash(t)}`;
+}
 export async function loadSeenCompanyRoles() {
   return new Set(
     (
       await query(
         "SELECT company,role FROM jobs UNION SELECT company,title AS role FROM scan_history WHERE status='added'",
       )
-    ).map(r => r.company.toLowerCase() + '::' + r.role.toLowerCase()),
+    ).map(r => companyRoleKey(r.company, r.role)),
   );
 }
 export async function appendToPipeline(offers, sourceDate) {
@@ -435,7 +469,7 @@ async function main() {
     ctx.shouldFetchContent = job => {
       if (!companyTitleFilter(job.title) || !locationFilter(job.location)) return false;
       if (seenUrls.has(job.url)) return false;
-      const key = `${job.company.toLowerCase()}::${job.title.toLowerCase()}`;
+      const key = companyRoleKey(job.company, job.title);
       return !seenCompanyRoles.has(key);
     };
     try {
@@ -465,7 +499,7 @@ async function main() {
           totalDupes++;
           continue;
         }
-        const key = `${job.company.toLowerCase()}::${job.title.toLowerCase()}`;
+        const key = companyRoleKey(job.company, job.title);
         if (seenCompanyRoles.has(key)) {
           totalDupes++;
           continue;
@@ -525,7 +559,7 @@ async function main() {
   console.log(`Total jobs found:      ${totalFound}`);
   console.log(`Filtered by title:     ${totalFilteredTitle} removed`);
   console.log(`Filtered by location:  ${totalFilteredLocation} removed`);
-  console.log(`Duplicates:            ${totalDupes} skipped`);
+  console.log(`Already tracked:       ${totalDupes} skipped`);
   console.log(`Location gate failed:  ${totalGateFailed} blocked`);
   console.log(`Missing full JD:       ${totalMissingContent} deferred`);
   console.log(`New offers added:      ${newOffers.length}`);

@@ -28,14 +28,14 @@ Use specific evidence from the CV instead of generic claims of fit.
 Handle gaps by leading with the nearest supported strength.
 Describe adjacent platforms, domains, tools, or methods factually without claiming equivalence.
 Plain supported self-description is acceptable, including statements of familiarity, competence, or experience.
-End after the final substantive paragraph.
-Do not add a manufactured closing sentence, interview request, offer to explain more, proposal to walk through future work, or tidy summary line.
+Do not add an interview request, offer to explain more, proposal to walk through future work, or one-line summary sentence anywhere in the letter.
+A line starting with `Boundary:` in the candidate CV states the limit of the evidence for that role or project. Never write a claim that goes past it. Never print the boundary, and never add a disclaimer, hedge or apology about what was not done.
 
-NO PARAGRAPH CAN BE A SINGLE SENTENCE LONG. CRITICAL IMPORTANCE PARAGRAPHS ***MUST*** BE MORE THAN 2 SENTENCES LONG.
+CRITICAL IMPORTANCE: EVERY PARAGRAPH ***MUST*** BE MORE THAN 3 SENTENCES LONG (AT LEAST FOUR SENTENCES), INCLUDING THE FINAL PARAGRAPH. A paragraph is never a single sentence and never one long run-on sentence; split a long sentence into separate sentences.
 
 NEVER START A SENTENCE OR PARAGRAPH WITH "I also"
 
-Using the information from the CV and the job description, finish the cover letter with a paragraph identifying why I would be an appropriate fit for the role. This paragraph should address what the JD says they are looking for in a candidate and why I am that candidate. Follow any instructions in the writing style guide (THIS IS CRITICAL IMPORTANCE - COVER LETTER MUST OBEY STYLE RESTRICTIONS LISTED). Make sure this paragraph is more than one sentence and aim for around 50-80 words.
+Using the information from the CV and the job description, finish the cover letter with a paragraph identifying why I would be an appropriate fit for the role. This paragraph should address what the JD says they are looking for in a candidate and why I am that candidate. Follow any instructions in the writing style guide (THIS IS CRITICAL IMPORTANCE - COVER LETTER MUST OBEY STYLE RESTRICTIONS LISTED). Aim for around 50-80 words in this paragraph. The letter ends with this paragraph; add nothing after it.
 
 ** ABSOLUTELY FORBIDDEN WORDS TO USE:
 "same"

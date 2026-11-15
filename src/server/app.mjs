@@ -715,10 +715,10 @@ export function createApp({
     { schema: { response: { 200: publicSchemas.CostSummaryResponse } } },
     async request => {
       if (!costService) throw costUnavailable();
-      const allowed = ['range'];
-      const { range } = normalizeCostQuery(onlyQuery(request, allowed), { allowed });
+      const allowed = ['range', 'estimates'];
+      const query = normalizeCostQuery(onlyQuery(request, allowed), { allowed });
       return {
-        data: await costService.summary({ range }),
+        data: await costService.summary(query),
         meta: { requestId: request.requestId, observedAt: new Date().toISOString() },
       };
     },
@@ -728,7 +728,7 @@ export function createApp({
     { schema: { response: { 200: publicSchemas.CostCallsResponse } } },
     async request => {
       if (!costService) throw costUnavailable();
-      const allowed = ['range', 'jobId', 'limit'];
+      const allowed = ['range', 'jobId', 'limit', 'estimates'];
       const query = normalizeCostQuery(onlyQuery(request, allowed), { allowed });
       return {
         data: await costService.calls(query),

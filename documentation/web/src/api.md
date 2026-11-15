@@ -105,3 +105,5 @@ banner and the failing card give one cause. `dev` on either side never counts as
 ## Cost calls (package 4.7)
 
 `costSummary(range)` GETs `/api/v1/cost/summary?range=` and `costCalls(range, limit)` GETs `/api/v1/cost/calls?range=&limit=`. Both are checked for the count fields, `estimatedUsd` (number or null), job and day fields, and `unpriced`; a shape mismatch is an `INVALID_RESPONSE` failure. Types `CostSummary`, `CostTotals`, `CostJobRow`, `CostCall` and `CostRange` come from the generated types.
+
+`costSummary(range, estimates)` and `costCalls(range, limit, estimates)` now send `estimates=include|exclude`.

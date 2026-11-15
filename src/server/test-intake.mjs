@@ -19,7 +19,10 @@ function makeService({ rows = {}, execute, ...options } = {}) {
     query: async (sql, args) => {
       queries.push([sql, args]);
       if (/SELECT DISTINCT trim\(company\)/.test(sql)) return rows.companies ?? [];
-      if (/FROM jobs WHERE url_key/.test(sql)) return rows.tracked ? [rows.tracked] : [];
+      if (/FROM jobs WHERE url IS NOT NULL/.test(sql))
+        return rows.tracked
+          ? [{ url: 'https://example.invalid/jobs/1', ...rows.tracked }]
+          : (rows.jobs ?? []);
       if (/FROM scan_history\s+WHERE/.test(sql)) return rows.seen ? [rows.seen] : [];
       if (/SELECT DISTINCT trim\(company\)/.test(sql)) return rows.companies ?? [];
       if (/SELECT jd_path/.test(sql)) return rows.jdPath ? [{ jd_path: rows.jdPath }] : [];
@@ -61,7 +64,7 @@ test('check: normalized URL, tracked job, seen sighting, neither, and unparseabl
     tracked: { id: '12', company: 'Acme', role: 'Eng', status: 'Applied' },
     seen: null,
   });
-  assert.deepEqual(tracked.queries[0][1], [urlKey('https://example.invalid/jobs/1/')]);
+  assert.match(tracked.queries[0][0], /FROM jobs WHERE url IS NOT NULL/);
   assert.equal(tracked.queries.length, 1, 'a tracked job stops the lookup');
 
   const seen = makeService({
@@ -330,9 +333,9 @@ test('add: an unexpected launcher line falls back to the job found by its normal
     role: 'Data Engineer',
     jdPath: 'data/jds/acme/data-engineer.md',
   });
-  assert.deepEqual(
-    found.queries[0][1],
-    [urlKey('https://example.invalid/jobs/1')],
+  assert.match(
+    found.queries[0][0],
+    /FROM jobs WHERE url IS NOT NULL/,
     'the same lookup check uses',
   );
   const noPath = makeService({
@@ -458,4 +461,52 @@ test('factory rejects non-function adapters', () => {
   assert.throws(() => createIntakeService({ query: 'no' }), TypeError);
   assert.throws(() => createIntakeService({ execute: null }), TypeError);
   assert.throws(() => createIntakeService({ activeScanRunId: 5 }), TypeError);
+});
+
+test('check: a job stored under an older key (tracking parameter, /en-US/) is found by the clean URL', async () => {
+  const old = makeService({
+    rows: {
+      jobs: [
+        {
+          id: '5',
+          company: 'Acme',
+          role: 'Eng',
+          status: 'Pending',
+          url: 'https://x.example/jobs/9?utm_source=a#top',
+          url_key: 'x.example/jobs/9?utm_source=a#top',
+        },
+      ],
+    },
+  });
+  assert.equal((await old.service.check({ url: 'https://x.example/jobs/9' })).tracked?.id, '5');
+  const wd = makeService({
+    rows: {
+      jobs: [
+        {
+          id: '6',
+          company: 'W',
+          role: 'E',
+          status: 'Pending',
+          url: 'https://t.wd3.myworkdayjobs.com/en-US/Site/job/a_JR1',
+          url_key: 'stale',
+        },
+      ],
+    },
+  });
+  assert.equal(
+    (await wd.service.check({ url: 'https://t.wd3.myworkdayjobs.com/Site/job/a_JR1' })).tracked?.id,
+    '6',
+  );
+  assert.equal(
+    (await wd.service.check({ url: 'https://t.wd3.myworkdayjobs.com/Site/job/other' })).tracked,
+    null,
+  );
+  assert.deepEqual(old.queries.find(q => /FROM scan_history/.test(q[0]))?.[1] ?? [[]], [[]]);
+});
+
+test('check: scan_history lookup matches the new key and the old-rule key', async () => {
+  const s = makeService({});
+  await s.service.check({ url: 'https://x.example/jobs/9?utm_source=a' });
+  const args = s.queries.find(q => /FROM scan_history/.test(q[0]))[1];
+  assert.deepEqual(args, [['x.example/jobs/9', 'x.example/jobs/9?utm_source=a']]);
 });

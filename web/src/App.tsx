@@ -4130,6 +4130,9 @@ function WorkspacePage({
               .filter(
                 key =>
                   !materials.items.some(m => m.key === key) &&
+                  // The button already reads "Drafting…" while a run is active; no second line for it.
+                  pendingHeader !== key &&
+                  !activeActions.includes(key) &&
                   !state.value.data.actions[key].enabled,
               )
               .map(key => (

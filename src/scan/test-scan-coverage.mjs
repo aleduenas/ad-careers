@@ -8,7 +8,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import yaml from 'js-yaml';
 
-import { buildTitleFilter, loadProviders } from './scan.mjs';
+import { buildTitleFilter, companyRoleKey, loadProviders } from './scan.mjs';
 import ashbyProvider from './providers/ashby-api.mjs';
 import greenhouseProvider from './providers/greenhouse-api.mjs';
 import pinpointProvider, { parsePinpointResponse } from './providers/pinpoint.mjs';
@@ -30,6 +30,49 @@ async function fixtureTests() {
   assert(!companyTitles('Staff Software Developer'));
   assert(!companyTitles('Sales Associate'));
   assert(!buildTitleFilter(titleRules)('Software Developer'));
+
+  // D108-1: short positive keywords match whole words only; longer ones stay substrings.
+  const shortKeys = buildTitleFilter({ positive: ['ETL', 'AI', 'Data Engineer'] });
+  assert(!shortKeys('Settlement Analyst'));
+  assert(shortKeys('ETL Developer'));
+  assert(shortKeys('Senior AI/ML Engineer'));
+  assert(!shortKeys('Maintenance Technician'));
+  assert(shortKeys('Senior Data Engineer'));
+  assert(buildTitleFilter({ positive: ['Data Engineer'] }, ['GRC'])('GRC Analyst'));
+  assert(!buildTitleFilter({ positive: ['Data Engineer'] }, ['GRC'])('Aggregrc'));
+
+  // D108-4b: company-role dedup normaliser.
+  assert.equal(
+    companyRoleKey('Acme Corp.', 'Data Engineer (5440)'),
+    companyRoleKey('ACME', 'data  engineer'),
+  );
+  assert.equal(companyRoleKey('Foo, Inc.', 'ML Engineer [ATH 5531]'), 'foo::ml engineer');
+  assert.equal(companyRoleKey('Foo Ltd', 'Sr. Engineer (Remote)'), 'foo::sr engineer remote');
+  assert.notEqual(companyRoleKey('TD', 'Analyst'), companyRoleKey('TD Bank', 'Analyst'));
+
+  // Leading word boundary for every positive keyword; trailing only for short ones.
+  const itRisk = buildTitleFilter({ positive: ['IT Risk'] });
+  assert(itRisk('Senior IT Risk Analyst'));
+  assert(itRisk('IT Risk Analyst'));
+  assert(!itRisk('Credit Risk Analyst'));
+  const sec = buildTitleFilter({ positive: ['Security'] });
+  assert(sec('Security Engineer'));
+  assert(sec('Application Security Developer'));
+  assert(!sec('Cybersecurity Engineer'));
+  assert(buildTitleFilter({ positive: ['Data Engineer'] })('Data Engineers'));
+  assert(buildTitleFilter({ positive: ['.NET'] })('Senior .NET Developer'));
+
+  // Only requisition tags are stripped from titles.
+  assert.equal(companyRoleKey('A', 'Analyst (5440)'), companyRoleKey('A', 'Analyst'));
+  assert.equal(companyRoleKey('A', 'Analyst (ATH 5531)'), companyRoleKey('A', 'Analyst'));
+  assert.notEqual(
+    companyRoleKey('A', 'Engineer (Level 2)'),
+    companyRoleKey('A', 'Engineer (Level 3)'),
+  );
+  assert.notEqual(
+    companyRoleKey('A', 'Analyst (6 months)'),
+    companyRoleKey('A', 'Analyst (12 months)'),
+  );
 
   const workable = parseWorkableMarkdown(
     '| Title | Department | Location | Type | Salary | Posted | Details |\n' +

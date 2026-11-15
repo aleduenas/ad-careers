@@ -4,6 +4,7 @@ import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { logTokenUsage } from '../lib/_token-debug.mjs';
+import { logRefOf } from '../lib/_llm-usage.mjs';
 import {
   draftingRoot,
   temporaryWorker,
@@ -129,6 +130,10 @@ await withOutputLock(archive, selection.out, 'letter', runId, async () => {
           model: config[provider + '_model'],
           fn: 'coverLetter',
           jobId: options.job ? String(options.job) : null,
+          logRef: logRefOf(
+            root,
+            join(run, attempt === 0 ? 'response.md' : 'retry-' + attempt + '-response.md'),
+          ),
         },
       });
       logTokenUsage(root, {

@@ -12,3 +12,5 @@ database errors; add parsing including a company that contains a dash separator;
 lock and active-scan refusal (nothing runs, lock released after refusals and failures, previews
 never take it); and the real executor on tiny scripts (stdin, environment, argv, output cap,
 timeout kill, missing binary). No database, network or real launcher is used.
+
+Also covers a job stored under an older key (tracking parameter, `/en-US/` Workday segment) being found by the clean URL, and the `scan_history` lookup receiving both the new and old-rule keys.

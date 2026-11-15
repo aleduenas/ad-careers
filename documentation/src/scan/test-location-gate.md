@@ -1,7 +1,7 @@
 # src/scan/test-location-gate.mjs
 
 **Kind:** test
-**Purpose:** Regression cases for `gate()` in `location-gate-core.mjs`: US-only residency language overrides remote metadata (FAIL), remote-from-Canada passes, a provider location of `New York, United States (Remote)` fails even with a remote title, a UK city fails, `Remote (United States | Canada)` passes, and a remote-friendly multi-US-city string fails.
+**Purpose:** Regression cases for `gate()` in `location-gate-core.mjs`: US-only residency language overrides remote metadata (FAIL), remote-from-Canada passes, a provider location of `New York, United States (Remote)` fails even with a remote title, a UK city fails, `Remote (United States | Canada)` passes, `U.S.` spellings (`Remote U.S.`, `U.S. Remote`, `Remote (U.S.)`, `U.S.A.`) match the US patterns while `plus`/`join us` do not, and a remote-friendly multi-US-city string fails.
 
 ## Run
 `node src/scan/test-location-gate.mjs` (also discovered by `node src/test-all.mjs`). Prints `location gate tests passed`. No network; all inputs are inline strings.
@@ -13,7 +13,7 @@
 - none
 
 ## Imports
-- `./location-gate-core.mjs` (`gate`), `node:assert/strict`.
+- `./location-gate-core.mjs` (`gate`, `US_LOCATION_PATTERNS`), `node:assert/strict`.
 
 ## Used by
 - `src/test-all.mjs` (auto-discovered `src/**/test-*.mjs`).

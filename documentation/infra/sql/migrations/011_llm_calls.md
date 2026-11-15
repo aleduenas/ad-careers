@@ -26,7 +26,7 @@ recorded.
   dashboard; it has no foreign key so a missing run row can never lose an accounting row.
 - `reported_cost_usd` is the cost the Claude CLI reported, kept as evidence only. It is never the
   API-price figure the Cost page computes.
-- `source` is `live` (recorded by the launcher hook) or `backfill` (imported from old logs).
+- `source` is `live` (recorded by the launcher hook) or `backfill` (imported from old logs); migration 012 adds `estimate`.
 - `log_ref` is the repository-relative path of the log the row came from. A partial unique index
   makes it unique when set, which makes the backfill idempotent and lets a live row and a later
   backfill of the same log collide harmlessly (the second insert does nothing).

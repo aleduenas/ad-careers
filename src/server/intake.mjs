@@ -1,6 +1,6 @@
 import { spawn } from 'node:child_process';
 import { isAbsolute, relative, resolve } from 'node:path';
-import { query as databaseQuery, urlKey } from '../lib/_database.mjs';
+import { findJobByUrl, legacyUrlKey, query as databaseQuery, urlKey } from '../lib/_database.mjs';
 import { root as repositoryRoot } from '../lib/root.mjs';
 import { normalizeUrl } from '../scan/add-pasted-jd.mjs';
 import { DatabaseUnavailableError, SchemaNotReadyError } from './readiness.mjs';
@@ -116,10 +116,8 @@ export function createIntakeService({
     const normalized = normalizeUrl(url);
     if (!normalized) return { url: null, tracked: null, seen: null };
     const key = urlKey(normalized);
-    const jobs = await query(
-      'SELECT id::text AS id, company, role, status FROM jobs WHERE url_key = $1',
-      [key],
-    );
+    const tracked = await findJobByUrl(normalized, { query });
+    const jobs = tracked ? [tracked] : [];
     if (jobs[0])
       return {
         url: normalized,
@@ -136,10 +134,10 @@ export function createIntakeService({
       `SELECT company, title, status, first_seen::text AS first_seen
          FROM scan_history
         WHERE lower(regexp_replace(regexp_replace(regexp_replace(url, '^https?://(www\\.)?', '', 'i'),
-              '[)\\].,;]+$', ''), '/+$', '')) = $1
+              '[)\\].,;]+$', ''), '/+$', '')) = ANY($1::text[])
         ORDER BY first_seen DESC NULLS LAST
         LIMIT 1`,
-      [key],
+      [[key, legacyUrlKey(normalized)]],
     );
     return {
       url: normalized,

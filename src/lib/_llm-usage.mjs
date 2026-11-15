@@ -156,7 +156,7 @@ export async function recordCall(row, { query = defaultQuery } = {}) {
       !usage,
       row.durationMs ?? usage?.durationMs ?? null,
       Number.isInteger(row.exitCode) ? row.exitCode : null,
-      row.source === 'backfill' ? 'backfill' : 'live',
+      ['backfill', 'estimate'].includes(row.source) ? row.source : 'live',
       row.logRef ?? null,
     ],
   );
@@ -212,6 +212,12 @@ const order = p =>
   `sum(${p}input_tokens+${p}cache_read_tokens+${p}cache_write_tokens+${p}output_tokens) DESC`;
 
 const num = v => Number(v);
+// 'include' (default) or 'exclude' estimated rows (source = 'estimate').
+function withEstimates(value) {
+  if (value !== 'include' && value !== 'exclude')
+    throw new Error('estimates must be include or exclude');
+  return value === 'include';
+}
 function shape(row) {
   return {
     calls: row?.calls ?? 0,
@@ -275,6 +281,7 @@ export async function readCalls({
   range = '30d',
   jobId = null,
   limit = 100,
+  estimates = 'include',
   query = defaultQuery,
   now,
 } = {}) {
@@ -288,8 +295,9 @@ export async function readCalls({
      FROM llm_calls c LEFT JOIN jobs j ON j.id = c.job_id
      WHERE ($1::timestamptz IS NULL OR c.called_at >= $1::timestamptz)
        AND ($2::bigint IS NULL OR c.job_id = $2::bigint)
+       AND ($4::boolean OR c.source <> 'estimate')
      ORDER BY c.called_at DESC, c.id DESC LIMIT $3`,
-    [since, jobId == null ? null : String(jobId), cap],
+    [since, jobId == null ? null : String(jobId), cap, withEstimates(estimates)],
   );
   return rows.map(r => ({
     id: num(r.id),
@@ -315,14 +323,21 @@ export async function readCalls({
 }
 
 // Unlimited count of the calls readCalls would list for the same filter.
-export async function countCalls({ range = '30d', jobId = null, query = defaultQuery, now } = {}) {
+export async function countCalls({
+  range = '30d',
+  jobId = null,
+  estimates = 'include',
+  query = defaultQuery,
+  now,
+} = {}) {
   const since = sinceOf(range, now);
   if (jobId != null && !/^\d+$/.test(String(jobId))) throw new Error('jobId must be numeric');
   const [row] = await query(
     `SELECT count(*)::int AS n FROM llm_calls c
      WHERE ($1::timestamptz IS NULL OR c.called_at >= $1::timestamptz)
-       AND ($2::bigint IS NULL OR c.job_id = $2::bigint)`,
-    [since, jobId == null ? null : String(jobId)],
+       AND ($2::bigint IS NULL OR c.job_id = $2::bigint)
+       AND ($3::boolean OR c.source <> 'estimate')`,
+    [since, jobId == null ? null : String(jobId), withEstimates(estimates)],
   );
   return row?.n ?? 0;
 }
@@ -330,13 +345,19 @@ export async function countCalls({ range = '30d', jobId = null, query = defaultQ
 // One row per (UTC day, provider, model, function, job) so the API can build every breakdown and
 // price each group by model. No LIMIT. reportedCostUsd sums only the calls that carry a reported
 // cost; reportedCostCalls says how many did.
-export async function cubeCalls({ range = '30d', query = defaultQuery, now } = {}) {
+export async function cubeCalls({
+  range = '30d',
+  estimates = 'include',
+  query = defaultQuery,
+  now,
+} = {}) {
   const since = sinceOf(range, now);
   const rows = await query(
     `SELECT to_char(c.called_at AT TIME ZONE 'UTC','YYYY-MM-DD') AS day, c.provider, c.model,
        c.function, c.job_id, j.company, j.role, ${sums('c.')},
        COALESCE(sum(c.reported_cost_usd),0)::float8 AS reported_cost_usd,
        count(c.reported_cost_usd)::int AS reported_cost_calls,
+       (count(*) FILTER (WHERE c.source = 'estimate'))::int AS estimated_calls,
        (count(*) FILTER (WHERE c.reported_cost_usd IS NULL))::int AS unreported_calls,
        COALESCE(sum(c.input_tokens) FILTER (WHERE c.reported_cost_usd IS NULL),0)::bigint AS unreported_input,
        COALESCE(sum(c.cache_read_tokens) FILTER (WHERE c.reported_cost_usd IS NULL),0)::bigint AS unreported_cache_read,
@@ -344,9 +365,10 @@ export async function cubeCalls({ range = '30d', query = defaultQuery, now } = {
        COALESCE(sum(c.output_tokens) FILTER (WHERE c.reported_cost_usd IS NULL),0)::bigint AS unreported_output
      FROM llm_calls c LEFT JOIN jobs j ON j.id = c.job_id
      WHERE ($1::timestamptz IS NULL OR c.called_at >= $1::timestamptz)
+       AND ($2::boolean OR c.source <> 'estimate')
      GROUP BY 1, c.provider, c.model, c.function, c.job_id, j.company, j.role
      ORDER BY 1, c.provider, c.model, c.function, c.job_id`,
-    [since],
+    [since, withEstimates(estimates)],
   );
   return {
     since: since ? since.toISOString() : null,
@@ -361,6 +383,7 @@ export async function cubeCalls({ range = '30d', query = defaultQuery, now } = {
       ...shape(r),
       reportedCostUsd: num(r.reported_cost_usd),
       reportedCostCalls: r.reported_cost_calls,
+      estimatedCalls: r.estimated_calls,
       unreported: {
         calls: r.unreported_calls,
         inputTokens: num(r.unreported_input),

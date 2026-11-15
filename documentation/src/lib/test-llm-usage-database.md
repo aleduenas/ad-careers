@@ -13,5 +13,6 @@ Needs `TEST_DATABASE_URL` naming a `career_ops_test_*` database (it refuses anyt
 - Race: 12 concurrent inserts of one `log_ref` leave exactly one row.
 - Backfill from fixture logs: function, provider, job id (unknown job becomes null), model and timestamp derivation; first run inserts, second run inserts nothing; no job, evaluation, status-event or JD row is touched.
 - Job repair: only a null-job row is a candidate, it gets the job its path yields, a set job id is never overwritten, a rerun repairs nothing.
+- Migration 012: the `estimate` source is accepted and other values rejected; an estimated row is idempotent on `log_ref`, unreported, and every reader honours `estimates: 'include' | 'exclude'` with the with/without totals reconciling and `estimatedCalls` summed.
 - Restart: a new connection pool sees the same rows and still deduplicates.
 - `cubeCalls` grouping, joined company and role, reported-cost sums and counts, and `countCalls` against `readCalls`' filter.

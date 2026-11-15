@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import * as nodeFs from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import {
+  findJobByUrl,
   query as databaseQuery,
   transaction as databaseTransaction,
   urlKey,
@@ -232,6 +233,7 @@ export function createJobsWrite({
     if (typeof body.field !== 'string' || !FIELDS.has(body.field)) throw invalid('field');
     let sql;
     let args;
+    let newUrl = null;
     if (body.field === 'company' || body.field === 'role') {
       const value = cleanText(body.value, 'value');
       if (typeof body.expectedValue !== 'string') throw invalid('expectedValue');
@@ -241,6 +243,7 @@ export function createJobsWrite({
       args = [value, id, body.expectedValue];
     } else if (body.field === 'url') {
       const value = cleanUrl(body.value);
+      newUrl = value;
       if (body.expectedValue !== null && typeof body.expectedValue !== 'string')
         throw invalid('expectedValue');
       // The job DTO shows the URL normalized by URL(), so the guard also accepts the stored
@@ -285,6 +288,9 @@ export function createJobsWrite({
       args = [min, max, id, expectedMin, expectedMax];
     }
     return guarded(async () => {
+      // Rows stored under an older url_key still count: compare urlKey(url) in JS first.
+      if (newUrl !== null && (await findJobByUrl(newUrl, { excludeId: id, query })))
+        throw await conflict('URL_IN_USE', 'Another job already uses that URL.', id);
       let updated;
       try {
         updated = await query(sql, args);

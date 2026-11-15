@@ -463,3 +463,10 @@ CREATE UNIQUE INDEX llm_calls_log_ref_key ON llm_calls (log_ref) WHERE log_ref I
 CREATE INDEX llm_calls_called_idx ON llm_calls (called_at DESC);
 CREATE INDEX llm_calls_job_idx ON llm_calls (job_id, called_at DESC) WHERE job_id IS NOT NULL;
 CREATE INDEX llm_calls_model_idx ON llm_calls (model, called_at DESC);
+
+-- 012_llm_calls_estimate_source.sql
+-- llm_calls.source gains 'estimate' for drafting runs that kept no usage (D093). Estimated rows are
+-- always labelled so readers can include or exclude them. 011 is immutable, so the CHECK that
+-- 011 created without a name (llm_calls_source_check) is replaced here. No data changes.
+ALTER TABLE llm_calls DROP CONSTRAINT llm_calls_source_check;
+ALTER TABLE llm_calls ADD CONSTRAINT llm_calls_source_check CHECK (source IN ('live','backfill','estimate'));

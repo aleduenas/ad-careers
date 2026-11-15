@@ -1,5 +1,7 @@
 # src/scan/location-gate-core.mjs
 
+> Change D108: the US pattern for `U.S.` now uses lookarounds instead of `\b`, so `Remote U.S.`, `U.S. Remote`, `Remote (U.S.)` and `U.S.A.` are recognised as US without matching `plus` or `us` in prose.
+
 **Kind:** shared module
 **Purpose:** Deterministic location gate used by `scan.mjs` after a JD is cached. `gate(url, company, role, jdContent?, jobLocation?)` returns `{decision: PASS|FAIL, reason, confidence: high|low}` using regex signals for Toronto-area, Canada, US, remote and hard work-authorization phrases. Eligible means Toronto-area (on-site/hybrid) or explicitly remote-from-Canada; when in doubt it passes with low confidence and leaves the final call to the evaluator. Also exports `parseFrontmatter` and the pattern arrays.
 

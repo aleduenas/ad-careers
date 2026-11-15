@@ -1,7 +1,7 @@
 # src/lib/_database.mjs
 
 **Kind:** shared module
-**Purpose:** The single PostgreSQL access layer for every backend script. It resolves connection settings from `.env` or the environment, holds one lazily created `pg.Pool`, and exposes `query`, `transaction`, `createJob`, `getJob`, `urlKey` and `close`. Job creation goes through the `create_job` SQL function so ID allocation and URL deduplication happen in the database.
+**Purpose:** The single PostgreSQL access layer for every backend script. It resolves connection settings from `.env` or the environment, holds one lazily created `pg.Pool`, and exposes `query`, `transaction`, `createJob`, `getJob`, `findJobByUrl`, `urlKey` and `close`. Job creation goes through the `create_job` SQL function so ID allocation and URL deduplication happen in the database.
 
 ## Run
 Not runnable; imported by other modules.
@@ -29,6 +29,7 @@ Not runnable; imported by other modules.
 ## Notes
 - Pool settings: 5 s connection timeout, 15 s statement timeout, `allowExitOnIdle` so scripts exit without calling `close()`; scripts still call `close()` in `finally` for promptness.
 - `transaction(fn)` runs `BEGIN`/`COMMIT` and `ROLLBACK` on any throw; `fn` receives the raw client.
-- `urlKey` strips scheme, `www.`, trailing punctuation and slashes and lower-cases; it is the dedup key stored in `jobs.url_key`.
+- `urlKey` strips scheme, `www.`, the fragment (except a hash-route fragment starting `#/` or `#!/`, which is kept so `careers#/job/1` and `#/job/2` stay distinct), tracking query parameters (`jr_id`, `source`, `src`, `gh_src`, `ref`, `lever-source`, `utm_*`, and `l` without a value), a Workday locale path segment (`/en-US/`) on `*.myworkdayjobs.com`, trailing punctuation and slashes, and lower-cases; meaningful parameters (`gh_jid`, `jobId`, `career_job_req_id`, `token`, `for`) are kept. It is the dedup key stored in `jobs.url_key`.
+- `legacyUrlKey` is the previous `urlKey` (no fragment, parameter or locale handling). Rows written before the change keep that style of value in `jobs.url_key`, so job lookups never trust the stored column: `findJobByUrl(url, {excludeId, query})` reads `jobs` (id, company, role, status, url, url_key) and matches `urlKey(row.url) === urlKey(url)` (or an equal stored key) in JS. `create_job`'s `ON CONFLICT(url_key)` is unchanged, so that JS pre-check is what prevents a second row for an old posting. See `test-url-key.md`.
 - `createJob` validates `source_date` as `YYYY-MM-DD` and defaults it to today.
 - Connection loss (F29): the pool has an `error` listener and every pooled client gets one on `connect`, so a PostgreSQL restart or `pg_terminate_backend` no longer crashes the process. The failed client is discarded and the next query reconnects. The loss is logged once per outage as `Database connection lost (<SQLSTATE code>); the next query reconnects.` with no message text, connection string or credential; a successful query re-arms the log. `transaction` keeps the original error when the rollback itself fails and releases the dead client as broken. In-flight queries reject with the driver error, which callers map to the normal unavailable errors.

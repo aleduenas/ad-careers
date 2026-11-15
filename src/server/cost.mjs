@@ -6,6 +6,7 @@ import { DatabaseUnavailableError, SchemaNotReadyError } from './readiness.mjs';
 // estimatedUsd prices the same counts at the public API prices in config/llm-prices.json.
 
 const RANGES = new Set(['7d', '30d', '90d', 'all']);
+const ESTIMATES = new Set(['include', 'exclude']);
 const DEFAULT_RANGE = '30d';
 const DEFAULT_LIMIT = 100;
 const MAX_LIMIT = 500;
@@ -26,6 +27,11 @@ export function normalizeCostQuery(raw = {}, { allowed }) {
   const range = raw.range === undefined ? DEFAULT_RANGE : raw.range;
   if (!RANGES.has(range)) throw requestError('range');
   const result = { range };
+  if (allowed.includes('estimates')) {
+    if (raw.estimates !== undefined && !ESTIMATES.has(raw.estimates))
+      throw requestError('estimates');
+    result.estimates = raw.estimates ?? 'include';
+  }
   if (allowed.includes('jobId')) {
     if (raw.jobId !== undefined && !/^[1-9][0-9]{0,17}$/.test(raw.jobId))
       throw requestError('jobId');
@@ -54,13 +60,22 @@ const totalOf = t => t.inputTokens + t.cachedInputTokens + t.cacheWriteTokens + 
 
 // Accumulates leaf rows (one provider/model each) so USD is priced per model, then rolled up.
 function newGroup(extra = {}) {
-  return { ...extra, ...emptyTokens(), usd: 0, priced: 0, unpriced: 0, unpricedCalls: 0 };
+  return {
+    ...extra,
+    ...emptyTokens(),
+    usd: 0,
+    priced: 0,
+    unpriced: 0,
+    unpricedCalls: 0,
+    estimatedCalls: 0,
+  };
 }
 
 // A row's calls split into those with a CLI-reported cost (summed as is) and the rest, whose
 // token sums the storage returns separately (row.unreported) and the table prices.
 function addLeaf(group, leaf, price, reported, unreported) {
   group.calls += leaf.calls;
+  group.estimatedCalls += leaf.estimatedCalls;
   group.inputTokens += leaf.inputTokens;
   group.cachedInputTokens += leaf.cachedInputTokens;
   group.cacheWriteTokens += leaf.cacheWriteTokens;
@@ -103,11 +118,13 @@ function leafOf(row) {
     cacheWriteTokens: Number(row.cacheWriteTokens) || 0,
     outputTokens: Number(row.outputTokens) || 0,
     reasoningTokens: Number(row.reasoningTokens) || 0,
+    // Calls whose tokens are estimates (source 'estimate'), not measurements.
+    estimatedCalls: Math.min(Number(row.estimatedCalls) || 0, Number(row.calls) || 0),
   };
 }
 
 // Pure roll-up of cube rows (day, provider, model, function, jobId, company, role + token sums).
-export function summarize({ range, since, until, rows, prices }) {
+export function summarize({ range, since, until, rows, prices, estimates = 'include' }) {
   const index = priceIndex(prices);
   const totals = newGroup();
   const models = new Map();
@@ -171,6 +188,7 @@ export function summarize({ range, since, until, rows, prices }) {
   const list = map => [...map.values()].map(finish);
   return {
     range,
+    estimates,
     since: since ?? null,
     until,
     totals: finish(totals),
@@ -185,7 +203,7 @@ export function summarize({ range, since, until, rows, prices }) {
 
 export function shapeCall(row, index) {
   const leaf = leafOf({ ...row, calls: 1 });
-  const { calls: _calls, ...tokens } = leaf;
+  const { calls: _calls, estimatedCalls: _estimated, ...tokens } = leaf;
   return {
     id: String(row.id),
     occurredAt: row.calledAt,
@@ -249,28 +267,38 @@ export function createCostService({
     return loaded;
   };
   return {
-    async summary({ range = DEFAULT_RANGE } = {}) {
+    async summary({ range = DEFAULT_RANGE, estimates = 'include' } = {}) {
       const at = now();
       const list = loadedPrices().prices;
-      const { since, rows } = await guarded(() => reader.cube({ range, now: at }));
+      const { since, rows } = await guarded(() => reader.cube({ range, estimates, now: at }));
       return summarize({
         range,
         since: since instanceof Date ? since.toISOString() : (since ?? null),
         until: at.toISOString(),
         rows,
         prices: list,
+        estimates,
       });
     },
-    async calls({ range = DEFAULT_RANGE, jobId = null, limit = DEFAULT_LIMIT } = {}) {
+    async calls({
+      range = DEFAULT_RANGE,
+      jobId = null,
+      limit = DEFAULT_LIMIT,
+      estimates = 'include',
+    } = {}) {
       const at = now();
       const index = priceIndex(loadedPrices().prices);
       const [rows, total] = await guarded(() =>
         Promise.all([
-          reader.calls({ range, jobId, limit, now: at }),
-          reader.count({ range, jobId, now: at }),
+          reader.calls({ range, jobId, limit, estimates, now: at }),
+          reader.count({ range, jobId, estimates, now: at }),
         ]),
       );
-      return { range, calls: rows.map(row => shapeCall(row, index)), total: Number(total) || 0 };
+      return {
+        range,
+        calls: rows.map(row => shapeCall(row, index)),
+        total: Number(total) || 0,
+      };
     },
   };
 }

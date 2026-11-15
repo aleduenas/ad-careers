@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import assert from 'node:assert/strict';
-import { gate } from './location-gate-core.mjs';
+import { gate, US_LOCATION_PATTERNS } from './location-gate-core.mjs';
 
 const usOnlyRemote = `---
 location: Remote, United States
@@ -87,3 +87,16 @@ for (const location of ['Markham, Ontario', 'Brampton, Ontario', 'Oakville, Onta
     gate('https://example.test/job', 'Example', 'Engineer', null, location).decision,
     'PASS',
   );
+
+// D108-2: "U.S." forms are US; prose like "plus"/"us" is not.
+for (const location of ['Remote U.S.', 'U.S. Remote', 'Remote (U.S.)', 'U.S.A.', 'Remote, U.S.A'])
+  assert.ok(
+    US_LOCATION_PATTERNS.some(re => re.test(location)),
+    `${location} is US`,
+  );
+for (const text of ['plus remote', 'join us today', 'focus.', 'Toronto, Canada'])
+  assert.ok(!US_LOCATION_PATTERNS.some(re => re.test(text)), `${text} is not US`);
+assert.equal(
+  gate('https://example.test/job', 'Example', 'Engineer', null, 'Remote U.S.').decision,
+  'FAIL',
+);

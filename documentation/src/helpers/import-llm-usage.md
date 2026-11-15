@@ -12,6 +12,9 @@ The dry run only reads files and runs two read-only SELECTs (known job ids, alre
 
 The dry run reports `wouldRepairJob`: rows already recorded with no `job_id` whose log path yields a job that exists. `--apply` sets only that `job_id` (`UPDATE ... WHERE log_ref = ? AND job_id IS NULL`); a job id that is already set is never overwritten and nothing else on the row changes. Repair needs a `log_ref`, so live rows without one (drafting) cannot be repaired.
 
+## Estimating past drafting (D093)
+`node src/helpers/import-llm-usage.mjs --estimate-drafting [--apply]` estimates CV and cover-letter runs under `logs/drafting/runs/` that kept no usage and stores one `source = 'estimate'` row per call (needs migration 012 for `--apply`). Dry run is the default and prints the calibration constants, calls to estimate, skipped runs, assumptions, counts and token totals by month, function and provider, and a plain-ratio comparison (thinking = 0.58 times visible). Method, constants and skip rules are in `documentation/src/lib/_llm-estimate.md`. It reads the table only to find measured rows, the model timeline and job URLs; `--since=YYYY-MM-DD` (default `2026-11-06`, the CV drafter fix) sets the storage cutoff: the report has a `stored` section and a `notStoredBeforeCutoff` section with the same breakdown, and `--apply` inserts only runs whose folder date is on or after the cutoff; earlier runs are never inserted, whatever the flags. Insert is idempotent on `log_ref` (the response file).
+
 ## Reads
 - `logs/evaluation/**/*.stdout.log` and `logs/drafting/runs/**/*-usage.json`; the run's `run.json` for a fallback provider.
 

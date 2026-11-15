@@ -963,18 +963,18 @@ export function createApi(fetcher: typeof fetch = fetch) {
       if (!isIntakeFetched(result)) throw invalidResponse();
       return result;
     },
-    costSummary: async (range: CostRange, signal: AbortSignal) => {
+    costSummary: async (range: CostRange, estimates: boolean, signal: AbortSignal) => {
       const result = await read<unknown>(
-        `/api/v1/cost/summary?range=${encodeURIComponent(range)}`,
+        `/api/v1/cost/summary?range=${encodeURIComponent(range)}&estimates=${estimates ? 'include' : 'exclude'}`,
         fetcher,
         signal,
       );
       if (!isCostSummary(result)) throw invalidResponse();
       return result;
     },
-    costCalls: async (range: CostRange, limit: number, signal: AbortSignal) => {
+    costCalls: async (range: CostRange, limit: number, estimates: boolean, signal: AbortSignal) => {
       const result = await read<unknown>(
-        `/api/v1/cost/calls?range=${encodeURIComponent(range)}&limit=${limit}`,
+        `/api/v1/cost/calls?range=${encodeURIComponent(range)}&limit=${limit}&estimates=${estimates ? 'include' : 'exclude'}`,
         fetcher,
         signal,
       );

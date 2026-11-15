@@ -3926,3 +3926,28 @@ main#main[data-page='jobs'] {
     flex: 1 1 auto;
   }
 }
+
+.cost-est {
+  margin-left: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+.cost-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.cost-switch input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--green);
+}

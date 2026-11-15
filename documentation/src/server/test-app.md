@@ -24,4 +24,4 @@ Stage 3.5 cases: the schema export list, the letter routes (read, guarded PUT, m
 
 The jobs route test also passes `filter=any`, `scoreMin`, `scoreMax` and `addedWeek` through to the reader and rejects duplicates.
 
-Stage 4.7 cost cases: `range`, `jobId` and `limit` pass to the injected cost service, bad, repeated or unknown query keys are 400, no POST route exists, a missing service is 503 `COST_UNAVAILABLE`, storage errors keep their public codes, and the session `cost` capability follows the service.
+Stage 4.7 cost cases: `range`, `jobId`, `limit` and `estimates` pass to the injected cost service, bad, repeated or unknown query keys are 400, no POST route exists, a missing service is 503 `COST_UNAVAILABLE`, storage errors keep their public codes, and the session `cost` capability follows the service.

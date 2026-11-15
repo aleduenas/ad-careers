@@ -83,13 +83,63 @@ export async function transaction(fn) {
     client.release(broken);
   }
 }
-export function urlKey(url) {
+// Query parameters that only identify a campaign or referrer. Meaningful ones (gh_jid, jobId,
+// career_job_req_id, token, for) are kept because they select the posting.
+const TRACKING_PARAM = /^(jr_id|source|src|gh_src|ref|lever-source|utm_.*)$/;
+// The key this function produced before fragments, tracking parameters and Workday locale
+// segments were dropped. Rows written earlier keep that key in jobs.url_key, so lookups against
+// the stored column must try both.
+export function legacyUrlKey(url) {
   return (
     url
       ?.replace(/^https?:\/\/(www\.)?/, '')
       .replace(/[)\].,;]+$/, '')
       .replace(/\/+$/, '')
       .toLowerCase() || null
+  );
+}
+export function urlKey(url) {
+  if (!url) return null;
+  let rest = url.replace(/^https?:\/\/(www\.)?/, '');
+  // Hash-routed careers sites (`#/job/1`, `#!/job/1`) keep the fragment; every other one is dropped.
+  const hash = rest.indexOf('#');
+  const fragment = hash !== -1 && /^#!?\//.test(rest.slice(hash)) ? rest.slice(hash) : '';
+  if (hash !== -1) rest = rest.slice(0, hash);
+  const q = rest.indexOf('?');
+  let head = q === -1 ? rest : rest.slice(0, q);
+  const params = q === -1 ? [] : rest.slice(q + 1).split('&');
+  const kept = params.filter(p => {
+    if (!p) return false;
+    const [name, ...value] = p.split('=');
+    const lowered = name.toLowerCase();
+    if (TRACKING_PARAM.test(lowered)) return false;
+    return !(lowered === 'l' && value.join('=') === '');
+  });
+  head = head.replace(/^([^/]*\.myworkdayjobs\.com)\/[a-z]{2}-[a-z]{2}(?=\/)/i, '$1');
+  const joined = (kept.length ? `${head}?${kept.join('&')}` : head) + fragment;
+  return (
+    joined
+      .replace(/[)\].,;]+$/, '')
+      .replace(/\/+$/, '')
+      .toLowerCase() || null
+  );
+}
+// Finds the tracked job for a URL by comparing urlKey(jobs.url) in JS, so rows stored under an
+// older key (tracking parameter, fragment, Workday locale) are still found. The jobs table is
+// small and single-user, so a full read is fine. `run` is an injectable query function.
+export async function findJobByUrl(url, { excludeId = null, query: run = query } = {}) {
+  const key = urlKey(url);
+  if (!key) return null;
+  const rows = await run(
+    'SELECT id::text AS id, company, role, status, url, url_key FROM jobs WHERE url IS NOT NULL',
+  );
+  if (!Array.isArray(rows)) return null;
+  return (
+    rows.find(
+      row =>
+        (excludeId === null || String(row.id) !== String(excludeId)) &&
+        (urlKey(row.url) === key || row.url_key === key),
+    ) ?? null
   );
 }
 export async function createJob({

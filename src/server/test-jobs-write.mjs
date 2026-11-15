@@ -327,7 +327,7 @@ test('metadata: url sets url_key in the same statement and handles uniqueness', 
     expectedValue: null,
     value: ' https://www.Example.com/Jobs/42/ ',
   });
-  const [, sql, args] = calls[0];
+  const [, sql, args] = calls.at(-1);
   assert.match(sql, /SET url = \$1, url_key = \$2, revision = revision \+ 1/);
   assert.deepEqual(args, [
     'https://www.Example.com/Jobs/42/',
@@ -340,7 +340,8 @@ test('metadata: url sets url_key in the same statement and handles uniqueness', 
   assert.match(sql, /url_key = \$5/);
 
   const duplicate = makeWriter({
-    query: async () => {
+    query: async sql => {
+      if (/^SELECT/.test(sql)) return [];
       throw Object.assign(
         new Error('duplicate key value violates unique constraint "jobs_url_key_key"'),
         {
@@ -670,4 +671,41 @@ test('writeJdCache is contained: symlink targets and escapes are refused', async
 test('factory rejects bad adapters', () => {
   assert.throws(() => createJobsWrite({ query: 'no', detailReader: { detail() {} } }), TypeError);
   assert.throws(() => createJobsWrite({ detailReader: null }), TypeError);
+});
+
+test('metadata: url edit is refused when another job holds the URL under an older stored key', async () => {
+  const { writer, calls } = makeWriter({
+    state: {
+      rows: [
+        {
+          id: '9',
+          url: 'https://x.example/jobs/9?utm_source=a',
+          url_key: 'x.example/jobs/9?utm_source=a',
+        },
+        { id: '7', url: 'https://x.example/own', url_key: 'x.example/own' },
+      ],
+    },
+  });
+  await assert.rejects(
+    writer.updateMetadata('7', {
+      field: 'url',
+      expectedValue: null,
+      value: 'https://x.example/jobs/9',
+    }),
+    error => {
+      assert.equal(error.statusCode, 409);
+      assert.equal(error.publicCode, 'URL_IN_USE');
+      return true;
+    },
+  );
+  assert.equal(
+    calls.some(c => /UPDATE jobs/.test(c[1])),
+    false,
+    'no update is attempted',
+  );
+  await writer.updateMetadata('7', {
+    field: 'url',
+    expectedValue: null,
+    value: 'https://x.example/own',
+  });
 });

@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url';
 import { randomUUID } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { logTokenUsage } from '../lib/_token-debug.mjs';
+import { logRefOf } from '../lib/_llm-usage.mjs';
 import {
   draftingRoot,
   temporaryWorker,
@@ -214,6 +215,7 @@ await withOutputLock(archive, selection.out, 'cv', runId, async () => {
             model: config[provider + '_model'],
             fn: 'cv',
             jobId: options.job ? String(options.job) : null,
+            logRef: logRefOf(root, join(work, responseName)),
           },
         });
         logTokenUsage(root, {

@@ -58,7 +58,8 @@ export const US_LOCATION_PATTERNS = [
   /united states/i,
   /\bUS\b/,
   /\bUSA\b/,
-  /\bU\.S\.\b/,
+  // No trailing \b: the final dot is not a word character, so "Remote U.S." needs a lookahead.
+  /(?<![A-Za-z0-9.])U\.S\.(?:A\.?)?(?![A-Za-z0-9])/,
   /\bU\.S\.A\./i,
   /\b(Alabama|Alaska|Arizona|Arkansas|California|Colorado|Connecticut|Delaware|Florida|Georgia|Hawaii|Idaho|Illinois|Indiana|Iowa|Kansas|Kentucky|Louisiana|Maine|Maryland|Massachusetts|Michigan|Minnesota|Mississippi|Missouri|Montana|Nebraska|Nevada|New Hampshire|New Jersey|New Mexico|New York|North Carolina|North Dakota|Ohio|Oklahoma|Oregon|Pennsylvania|Rhode Island|South Carolina|South Dakota|Tennessee|Texas|Utah|Vermont|Virginia|Washington|West Virginia|Wisconsin|Wyoming)\b/i,
   /,\s*(CA|NY|TX|WA|MA|IL|CO|GA|FL|AZ|PA|OR|MN|NC|VA|NV|OH|MI|MD|DC)\b/,

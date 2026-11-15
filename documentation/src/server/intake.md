@@ -8,8 +8,8 @@ discoveryLock, activeScanRunId, timeoutMs })` returns a frozen `{ check, compani
 Defaults use the shared pool and the bounded `runLauncher` executor; every adapter can be injected.
 
 **check({ url })** normalizes the URL with the launcher's own `normalizeUrl` and looks it up with
-the TUI's rules: a `jobs.url_key` match returns `tracked` `{id, company, role, status}`; otherwise
-a `scan_history` match (the same `urlKey` reduction, newest sighting) returns `seen` `{company,
+the TUI's rules: a `findJobByUrl` match (`urlKey(jobs.url)` compared in JS, so rows stored under an older key are found) returns `tracked` `{id, company, role, status}`; otherwise
+a `scan_history` match (SQL reduction with the old rules, matched against both the new `urlKey` and the old-rule key of the incoming URL; a scan_history row stored with a tracking parameter is not matched by the clean URL, since loading about 125,000 rows per request was ruled out; newest sighting) returns `seen` `{company,
 title, status, firstSeen}`; an unparseable URL returns `{url: null, tracked: null, seen: null}`.
 Read-only.
 

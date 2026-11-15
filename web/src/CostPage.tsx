@@ -22,6 +22,7 @@ const ranges: { id: CostRange; label: string }[] = [
 ];
 const RECENT_LIMIT = 50;
 const MODE_KEY = 'career-ops-cost-mode';
+const ESTIMATES_KEY = 'career-ops-cost-estimates';
 
 const whole = new Intl.NumberFormat(undefined);
 const compact = new Intl.NumberFormat(undefined, { notation: 'compact', maximumFractionDigits: 1 });
@@ -42,6 +43,14 @@ function usd(value: number | null): string {
 function readRange(): CostRange {
   const value = new URLSearchParams(location.search).get('range');
   return value === '7d' || value === '30d' || value === '90d' || value === 'all' ? value : '30d';
+}
+
+function readEstimates(): boolean {
+  try {
+    return localStorage.getItem(ESTIMATES_KEY) !== 'off';
+  } catch {
+    return true;
+  }
 }
 
 function readMode(): Mode {
@@ -93,7 +102,19 @@ function figure(
   return mode === 'tokens' ? row.totalTokens : row.estimatedUsd;
 }
 
-type Priced = { estimatedUsd: number | null; unpricedCalls?: number };
+type Priced = { estimatedUsd: number | null; unpricedCalls?: number; estimatedCalls?: number };
+
+/** A small "est." mark for an amount or count that includes estimated calls. */
+function Est({ row }: { row: { estimatedCalls?: number } }) {
+  const n = row.estimatedCalls ?? 0;
+  if (n <= 0) return null;
+  const note = `${exact(n)} estimated ${n === 1 ? 'call' : 'calls'}`;
+  return (
+    <span className="cost-est" role="img" aria-label={note} title={note}>
+      est.
+    </span>
+  );
+}
 
 /** The USD text; a sum that leaves some calls unpriced is a lower bound and ends in "+". */
 function usdText(row: Priced): string {
@@ -113,13 +134,17 @@ function UsdFigure({ row }: { row: Priced }) {
   return (
     <span title={note} aria-label={note ? `${usd(row.estimatedUsd)} or more, ${note}` : undefined}>
       {usdText(row)}
+      <Est row={row} />
     </span>
   );
 }
 
 function Figure({ row, mode }: { row: { totalTokens: number } & Priced; mode: Mode }) {
   return mode === 'tokens' ? (
-    <span title={exact(row.totalTokens)}>{exact(row.totalTokens)}</span>
+    <span title={exact(row.totalTokens)}>
+      {exact(row.totalTokens)}
+      <Est row={row} />
+    </span>
   ) : (
     <UsdFigure row={row} />
   );
@@ -133,7 +158,10 @@ function TokenCells({ row }: { row: CostTotals }) {
       <td className="num">{exact(row.cacheWriteTokens)}</td>
       <td className="num">{exact(row.outputTokens)}</td>
       <td className="num">{exact(row.reasoningTokens)}</td>
-      <td className="num">{exact(row.totalTokens)}</td>
+      <td className="num">
+        {exact(row.totalTokens)}
+        <Est row={row} />
+      </td>
     </>
   );
 }
@@ -204,7 +232,10 @@ function BreakdownTable({
             {rows.map(item => (
               <tr key={item.key}>
                 <th scope="row">{item.label}</th>
-                <td className="num">{exact(item.row.calls)}</td>
+                <td className="num">
+                  {exact(item.row.calls)}
+                  <Est row={item.row} />
+                </td>
                 {mode === 'tokens' ? (
                   <TokenCells row={item.row} />
                 ) : (
@@ -298,7 +329,7 @@ function DayBars({
   const peak = Math.max(...values, 0);
   const step = Math.max(1, Math.ceil(days.length / 10));
   const label = (day: CostSummary['byDay'][number]) =>
-    `${day.day}: ${mode === 'tokens' ? `${exact(day.totalTokens)} tokens` : usdText(day)}, ${exact(day.calls)} ${day.calls === 1 ? 'call' : 'calls'}`;
+    `${day.day}: ${mode === 'tokens' ? `${exact(day.totalTokens)} tokens` : usdText(day)}, ${exact(day.calls)} ${day.calls === 1 ? 'call' : 'calls'}${(day.estimatedCalls ?? 0) > 0 ? `, ${exact(day.estimatedCalls ?? 0)} estimated` : ''}`;
   return (
     <section className="cost-section" aria-labelledby="cost-days-title">
       <h2 id="cost-days-title">Per day</h2>
@@ -377,11 +408,24 @@ function DayBars({
   );
 }
 
-function Card({ label, value, title }: { label: string; value: string; title?: string }) {
+function Card({
+  label,
+  value,
+  title,
+  row,
+}: {
+  label: string;
+  value: string;
+  title?: string;
+  row?: { estimatedCalls?: number };
+}) {
   return (
     <article className="cost-card">
       <span>{label}</span>
-      <strong title={title}>{value}</strong>
+      <strong title={title}>
+        {value}
+        {row && <Est row={row} />}
+      </strong>
     </article>
   );
 }
@@ -394,6 +438,16 @@ export function CostPage({ api }: { api: Api }) {
     kind: 'loading',
   });
   const [retry, setRetry] = useState(0);
+  const [estimates, setEstimatesState] = useState(readEstimates);
+
+  const setEstimates = (next: boolean) => {
+    setEstimatesState(next);
+    try {
+      localStorage.setItem(ESTIMATES_KEY, next ? 'on' : 'off');
+    } catch {
+      // The choice only lasts for this visit when storage is unavailable.
+    }
+  };
 
   const setMode = (next: Mode) => {
     setModeState(next);
@@ -415,7 +469,7 @@ export function CostPage({ api }: { api: Api }) {
           ? error
           : new ApiFailure('The request failed.', 'REQUEST_FAILED', true),
     });
-    api.costSummary(range, controller.signal).then(
+    api.costSummary(range, estimates, controller.signal).then(
       value => {
         if (!controller.signal.aborted) setSummary({ kind: 'ok', value: value.data });
       },
@@ -423,7 +477,7 @@ export function CostPage({ api }: { api: Api }) {
         if (!controller.signal.aborted) setSummary(fail(error));
       },
     );
-    api.costCalls(range, RECENT_LIMIT, controller.signal).then(
+    api.costCalls(range, RECENT_LIMIT, estimates, controller.signal).then(
       value => {
         if (!controller.signal.aborted)
           setCalls({ kind: 'ok', value: { calls: value.data.calls, total: value.data.total } });
@@ -433,7 +487,7 @@ export function CostPage({ api }: { api: Api }) {
       },
     );
     return () => controller.abort();
-  }, [range, retry]);
+  }, [range, estimates, retry]);
 
   const jobNames = useMemo(() => {
     const map = new Map<string, string>();
@@ -475,6 +529,14 @@ export function CostPage({ api }: { api: Api }) {
             {label}
           </button>
         ))}
+        <label className="cost-switch">
+          <input
+            type="checkbox"
+            checked={estimates}
+            onChange={event => setEstimates(event.target.checked)}
+          />
+          Include estimates
+        </label>
       </div>
     </div>
   );
@@ -527,6 +589,12 @@ export function CostPage({ api }: { api: Api }) {
           {data.unpriced.length > 0 && ` Unpriced models: ${data.unpriced.join(', ')}.`}
         </p>
       )}
+      {estimates && (totals.estimatedCalls ?? 0) > 0 && (
+        <p className="pane-meta cost-note">
+          Drafting before Nov 12, 2026 was not logged; those calls are estimated from saved prompt
+          and response sizes and call durations.
+        </p>
+      )}
       {totals.calls === 0 ? (
         <section className="empty-state" role="status">
           <h2>No model calls in this range</h2>
@@ -538,7 +606,7 @@ export function CostPage({ api }: { api: Api }) {
       ) : (
         <>
           <section className="cost-cards" aria-label="Totals">
-            <Card label="Calls" value={exact(totals.calls)} />
+            <Card label="Calls" value={exact(totals.calls)} row={totals} />
             {mode === 'tokens' ? (
               <>
                 {(
@@ -551,13 +619,20 @@ export function CostPage({ api }: { api: Api }) {
                     ['Total tokens', totals.totalTokens],
                   ] as const
                 ).map(([label, value]) => (
-                  <Card key={label} label={label} value={short(value)} title={exact(value)} />
+                  <Card
+                    key={label}
+                    label={label}
+                    value={short(value)}
+                    title={exact(value)}
+                    row={totals}
+                  />
                 ))}
               </>
             ) : (
               <Card
                 label="Estimated cost at API prices"
                 value={usdText(totals)}
+                row={totals}
                 title={
                   totals.estimatedUsd === null
                     ? 'No priced calls in this range'
@@ -660,6 +735,9 @@ export function CostPage({ api }: { api: Api }) {
                             {call.source === 'backfill' && (
                               <span className="cost-sub">from logs</span>
                             )}
+                            {call.source === 'estimate' && (
+                              <span className="cost-sub">estimated</span>
+                            )}
                           </th>
                           <td>{call.function}</td>
                           <td>
@@ -675,7 +753,10 @@ export function CostPage({ api }: { api: Api }) {
                             )}
                           </td>
                           <td className="num">
-                            <Figure row={call} mode={mode} />
+                            <Figure
+                              row={{ ...call, estimatedCalls: call.source === 'estimate' ? 1 : 0 }}
+                              mode={mode}
+                            />
                           </td>
                         </tr>
                       ))}

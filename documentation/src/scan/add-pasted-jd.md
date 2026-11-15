@@ -12,7 +12,7 @@
 
 ## Reads
 - stdin JSON payload.
-- PostgreSQL: `jobs.company`, `scan_history.company` (distinct trimmed names for `canonicalCompany`); `jobs.url_key` (exact-duplicate check); `jobs.url`, `scan_history.url` (via `loadSeenUrls`, honored unless `force`). Connection through `src/lib/_database.mjs` (`.env` / `DATABASE_URL`).
+- PostgreSQL: `jobs.company`, `scan_history.company` (distinct trimmed names for `canonicalCompany`); `jobs.url` via `findJobByUrl` (exact-duplicate check, compared with `urlKey` in JS so rows stored under an older key are found); `jobs.url`, `scan_history.url` (via `loadSeenUrls`, honored unless `force`). Connection through `src/lib/_database.mjs` (`.env` / `DATABASE_URL`).
 - Existing `data/jds/<company>/<role>.md` frontmatter (via `jdStoragePath`) to avoid path collisions.
 
 ## Writes
@@ -20,7 +20,7 @@
 - PostgreSQL: `create_job(...)` and `sync_job_description(...)` via `createJob` (which also appends the job-id marker to the JD file); `INSERT INTO scan_history` with status `added` and portal `manual-paste`.
 
 ## Imports
-- `../lib/_database.mjs` (`createJob`, `query`, `urlKey`), `../lib/root.mjs` (`root`), `./scan.mjs` (`slugify`, `jdStoragePath`, `loadSeenUrls`, `appendToScanHistory`).
+- `../lib/_database.mjs` (`createJob`, `findJobByUrl`, `query`), `../lib/root.mjs` (`root`), `./scan.mjs` (`slugify`, `jdStoragePath`, `loadSeenUrls`, `appendToScanHistory`).
 
 ## Used by
 - `src/server/intake.mjs` and `src/server/runs.mjs` (JD submit action): marshal the intake fields (including `force`) to JSON, pipes them on stdin, log stdout+stderr under `logs/dashboard/`. The dashboard's own link check (`src/server/intake.mjs`) runs first, at the paste form's URL step, so `force` is normally only ever true after the user has confirmed a `scan_history`-only match.

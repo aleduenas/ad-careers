@@ -64,7 +64,7 @@ session reports `providerSettings`: the default service exists only with the def
 `providersService: null` disables it (503 `SETTINGS_UNAVAILABLE`). The default run service resolves
 its launcher flags from the same provider service.
 
-**Cost (4.7):** `GET /api/v1/cost/summary` and `GET /api/v1/cost/calls` call `cost.mjs`; they are read routes with strict query validation (`range`, `jobId`, `limit`). The session reports `cost`: the default service exists only with the default readiness check, an injected service counts as available, `costService: null` disables it (503 `COST_UNAVAILABLE`).
+**Cost (4.7):** `GET /api/v1/cost/summary` and `GET /api/v1/cost/calls` call `cost.mjs`; they are read routes with strict query validation (`range`, `jobId`, `limit`, `estimates`). The session reports `cost`: the default service exists only with the default readiness check, an injected service counts as available, `costService: null` disables it (503 `COST_UNAVAILABLE`).
 
 **Dispatch rules (Stage 3.4):** `POST /api/v1/runs` for evaluate, cv, letter and both accepts the
 optional `selection` override and answers failed prerequisites with 409 `PREREQUISITE_FAILED`

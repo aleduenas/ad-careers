@@ -80,6 +80,7 @@ try {
     .filter(n => n.endsWith('.sql'))
     .sort();
   assert.ok(migrations.includes('011_llm_calls.sql'), 'migration 011 is present');
+  assert.ok(migrations.includes('012_llm_calls_estimate_source.sql'), 'migration 012 is present');
   for (const name of migrations)
     await admin.query(readFileSync(join(root, 'infra/sql/migrations', name), 'utf8'));
 
@@ -338,6 +339,77 @@ try {
   pool = openPool();
   assert.equal((await aggregateCalls({ range: 'all', query })).totals.calls, 4 + 1 + 5);
   assert.deepEqual(await applyBackfill(plan.rows, { query }), { inserted: 0, alreadyPresent: 5 });
+
+  // Migration 012: estimated rows. The source CHECK accepts 'estimate' and nothing else new.
+  await assert.rejects(
+    q("INSERT INTO llm_calls (provider,model,function,source) VALUES ('claude','m','cv','guess')"),
+    /check/i,
+  );
+  const estimate = {
+    provider: 'claude',
+    model: 'model-a',
+    function: 'cv',
+    jobId: jobA,
+    source: 'estimate',
+    logRef: 'logs/drafting/runs/2026-09-20T10-00-00-000Z-aaaa1111/response.json',
+    calledAt: new Date(Date.now() - 2 * 86400e3).toISOString(),
+    usage: {
+      inputTokens: 100,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 200,
+      outputTokens: 50,
+      reasoningTokens: 20,
+      reportedCostUsd: null,
+    },
+  };
+  assert.ok(await recordCall(estimate, { query }));
+  assert.equal(await recordCall(estimate, { query }), null, 'an estimate is idempotent on log_ref');
+  const stored = (
+    await q(
+      "SELECT source, usage_missing, reported_cost_usd FROM llm_calls WHERE source='estimate'",
+    )
+  )[0];
+  assert.deepEqual(
+    [stored.source, stored.usage_missing, stored.reported_cost_usd],
+    ['estimate', false, null],
+  );
+  // Include and exclude on every reader; the cube counts estimated calls.
+  const total = await countCalls({ range: 'all', query });
+  assert.equal(await countCalls({ range: 'all', estimates: 'exclude', query }), total - 1);
+  assert.equal(await countCalls({ range: 'all', estimates: 'include', query }), total);
+  assert.equal(
+    (await readCalls({ range: 'all', limit: 500, query })).filter(r => r.source === 'estimate')
+      .length,
+    1,
+  );
+  assert.equal(
+    (await readCalls({ range: 'all', limit: 500, estimates: 'exclude', query })).filter(
+      r => r.source === 'estimate',
+    ).length,
+    0,
+  );
+  const withEst = await cubeCalls({ range: 'all', query });
+  const noEst = await cubeCalls({ range: 'all', estimates: 'exclude', query });
+  assert.equal(
+    withEst.rows.reduce((n, r) => n + r.estimatedCalls, 0),
+    1,
+  );
+  assert.equal(
+    noEst.rows.reduce((n, r) => n + r.estimatedCalls, 0),
+    0,
+  );
+  assert.equal(
+    withEst.rows.reduce((n, r) => n + r.calls, 0) - noEst.rows.reduce((n, r) => n + r.calls, 0),
+    1,
+    'summary with and without estimates reconciles',
+  );
+  const estRow = withEst.rows.find(r => r.estimatedCalls === 1);
+  assert.deepEqual(
+    [estRow.unreported.calls, estRow.unreported.cacheWriteTokens, estRow.reportedCostCalls],
+    [1, 200, 0],
+    'estimates are unreported and priced from the table',
+  );
+  await assert.rejects(countCalls({ estimates: 'maybe', query }), /estimates/);
 
   console.log('LLM usage database tests passed');
 } finally {

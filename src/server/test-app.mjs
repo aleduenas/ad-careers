@@ -1960,9 +1960,17 @@ test('cost routes validate queries strictly, stay read-only and report capabilit
       calls: [],
       total: 0,
     });
-    assert.deepEqual(seen.at(-1), ['calls', { range: '7d', jobId: '5', limit: 20 }]);
+    assert.deepEqual(seen.at(-1), [
+      'calls',
+      { range: '7d', estimates: 'include', jobId: '5', limit: 20 },
+    ]);
+    await get('/api/v1/cost/summary?range=7d&estimates=exclude');
+    assert.deepEqual(seen.at(-1), ['summary', { range: '7d', estimates: 'exclude' }]);
     for (const url of [
       '/api/v1/cost/summary?range=1d',
+      '/api/v1/cost/summary?estimates=only',
+      '/api/v1/cost/summary?estimates=include&estimates=exclude',
+      '/api/v1/cost/calls?estimates=',
       '/api/v1/cost/summary?range=7d&range=30d',
       '/api/v1/cost/summary?jobId=1',
       '/api/v1/cost/summary?extra=1',

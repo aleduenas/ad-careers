@@ -219,23 +219,42 @@ test('calls maps storage rows to the public shape with per-call price', async ()
   assert.equal(result.calls[2].estimatedUsd, 0.0111);
   assert.equal(result.calls[1].durationMs, null);
   assert.deepEqual(Object.keys(result.calls[0]).sort(), Object.keys(result.calls[1]).sort());
-  assert.deepEqual(seen[0][1], { range: '7d', jobId: '7', limit: 2, now: NOW });
+  assert.deepEqual(seen[0][1], {
+    range: '7d',
+    jobId: '7',
+    limit: 2,
+    estimates: 'include',
+    now: NOW,
+  });
   assert.equal(seen[1][1].jobId, '7');
 });
 
 test('query validation is strict', () => {
-  const summary = { allowed: ['range'] };
-  const calls = { allowed: ['range', 'jobId', 'limit'] };
-  assert.deepEqual(normalizeCostQuery({}, summary), { range: '30d' });
-  assert.deepEqual(normalizeCostQuery({ range: 'all' }, summary), { range: 'all' });
-  assert.deepEqual(normalizeCostQuery({}, calls), { range: '30d', jobId: null, limit: 100 });
+  const summary = { allowed: ['range', 'estimates'] };
+  const calls = { allowed: ['range', 'jobId', 'limit', 'estimates'] };
+  assert.deepEqual(normalizeCostQuery({}, summary), { range: '30d', estimates: 'include' });
+  assert.deepEqual(normalizeCostQuery({ range: 'all', estimates: 'exclude' }, summary), {
+    range: 'all',
+    estimates: 'exclude',
+  });
+  assert.deepEqual(normalizeCostQuery({}, calls), {
+    range: '30d',
+    estimates: 'include',
+    jobId: null,
+    limit: 100,
+  });
   assert.deepEqual(normalizeCostQuery({ jobId: '9', limit: '500' }, calls), {
     range: '30d',
+    estimates: 'include',
     jobId: '9',
     limit: 500,
   });
   for (const bad of [
     [{ range: '1d' }, summary],
+    [{ estimates: 'only' }, summary],
+    [{ estimates: '' }, calls],
+    [{ estimates: 'Include' }, calls],
+    [{ estimates: 'exclude' }, { allowed: ['range'] }],
     [{ range: '' }, summary],
     [{ range: '30D' }, summary],
     [{ jobId: '1' }, summary],
@@ -390,4 +409,81 @@ test('an invalid prices file is a public error, a missing one is not', async () 
     publicCode: 'PRICES_UNREADABLE',
   });
   assert.equal((await make({ prices: [], error: null, source: 'none' }).summary()).totals.calls, 0);
+});
+
+test('estimates: echoed, passed to the reader, counted per group and table priced', async () => {
+  const seenArgs = [];
+  const rows = [
+    cube({
+      calls: 3,
+      estimatedCalls: 0,
+      reportedCostUsd: 3,
+      reportedCostCalls: 3,
+      unreported: { calls: 0 },
+    }),
+    // Estimated rows have no reported cost: they take the unreported (table) path.
+    cube({
+      model: 'sonnet',
+      function: 'cv',
+      day: '2026-11-09',
+      jobId: '8',
+      calls: 2,
+      estimatedCalls: 2,
+    }),
+  ];
+  const reader = {
+    cube: async args => (seenArgs.push(args), { since: null, rows }),
+    calls: async () => [],
+    count: async () => 0,
+  };
+  const svc = createCostService({ reader, prices: () => ({ prices: PRICES }), now: () => NOW });
+  const summary = await svc.summary({ range: 'all', estimates: 'exclude' });
+  assert.equal(seenArgs[0].estimates, 'exclude');
+  assert.equal(summary.estimates, 'exclude');
+  validate('CostSummaryResponse')(envelope(summary));
+  assert.equal((await svc.summary({ range: 'all' })).estimates, 'include');
+  assert.equal(summary.totals.estimatedCalls, 2);
+  assert.equal(summary.byFunction.find(r => r.function === 'cv').estimatedCalls, 2);
+  assert.equal(summary.byFunction.find(r => r.function === 'evaluation').estimatedCalls, 0);
+  assert.equal(summary.byDay.find(d => d.day === '2026-11-09').estimatedCalls, 2);
+  assert.equal(summary.byJob.find(j => j.jobId === '8').estimatedCalls, 2);
+  assert.equal(summary.byModel[0].estimatedCalls, 2);
+  // 3 reported + 8.55 table price of the estimated row.
+  assert.equal(summary.totals.estimatedUsd, 11.55);
+  // estimatedCalls never exceeds calls.
+  const capped = summarize({
+    range: 'all',
+    since: null,
+    until: NOW.toISOString(),
+    rows: [cube({ calls: 1, estimatedCalls: 5 })],
+    prices: PRICES,
+  });
+  assert.equal(capped.totals.estimatedCalls, 1);
+  assert.equal(capped.estimates, 'include');
+});
+
+test('call rows pass source estimate through and do not leak estimatedCalls', async () => {
+  const stored = {
+    id: 5,
+    calledAt: '2026-11-01T10:00:00.000Z',
+    provider: 'claude',
+    model: 'sonnet',
+    function: 'cv',
+    jobId: null,
+    runId: null,
+    inputTokens: 1000,
+    cacheReadTokens: 0,
+    cacheWriteTokens: 0,
+    outputTokens: 100,
+    reasoningTokens: 0,
+    reportedCostUsd: null,
+    durationMs: null,
+    source: 'estimate',
+  };
+  const { service: svc } = service([], { calls: [stored] });
+  const result = await svc.calls({ estimates: 'include' });
+  validate('CostCallsResponse')(envelope(result));
+  assert.equal(result.calls[0].source, 'estimate');
+  assert.equal(result.calls[0].estimatedUsd, 0.0045);
+  assert.equal('estimatedCalls' in result.calls[0], false);
 });

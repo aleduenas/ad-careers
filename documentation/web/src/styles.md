@@ -111,3 +111,5 @@ and make the page fill the viewport from 1024 px. Removed: `.materials-strip`, `
 **F39 additions:** `.ws-material-link` (a button that looks like the material link), `.letter-modal` (centered dialog, 780 px wide, tall plain-text area, full-width sheet at 600 px and below), `.letter-modal-head`, `.letter-modal-foot`, `.letter-modal-file`, `.letter-modal-read`.
 
 **Shell banner fix:** at 700 px and below `.build-banner` is in the page flow (static) and the sidebar gets no top offset, so the banner pushes content down and nothing sits over the theme button.
+
+**D093 additions:** `.cost-est` (the small italic "est." mark) and `.cost-switch` (the Include estimates checkbox row).

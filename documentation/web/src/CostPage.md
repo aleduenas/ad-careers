@@ -31,3 +31,10 @@ through `api.costSummary` and `api.costCalls`; it never substitutes sample data.
 - **Region names.** Every scroll region is named "<section> table" (for example "Per model table"), so none repeats its section heading's name; the chart's list is "Per day chart".
 - **URL.** `?range=` is removed (history replace) when the Cost page unmounts.
 - **Partial sums.** A group with `unpricedCalls` above zero and a non-null `estimatedUsd` shows the amount with a trailing "+", a tooltip and an accessible name "N calls not priced" (cards, tables, day bars); a missing field counts as zero.
+
+## Estimated drafting history (D093)
+
+- **Switch.** An "Include estimates" checkbox sits beside the Tokens | API price toggle (default on, remembered under `career-ops-cost-estimates`, sent as `estimates=include|exclude` on both calls).
+- **Marks.** Where a group has `estimatedCalls` above zero, the calls count, the total tokens or USD (tables and cards) and the day bar labels carry a small "est." mark with the accessible name "N estimated calls"; it sits next to the "+" mark when both apply. Missing fields count as zero.
+- **Recent calls.** Rows with `source: 'estimate'` are tagged "estimated".
+- **Sentence.** With estimates on and `totals.estimatedCalls` above zero, one quiet sentence says drafting before Nov 12, 2026 was not logged and is estimated from prompt and response sizes and call durations.

@@ -1,7 +1,7 @@
 # src/scan/test-scan-coverage.mjs
 
 **Kind:** test
-**Purpose:** Two groups of checks. `fixtureTests` exercises `buildTitleFilter` and the Workable, Pinpoint, SuccessFactors, Ashby and Greenhouse providers against in-memory HTTP contexts (`get`/`getJson` stubs recording the URLs they were asked for). `verifierTests` runs `verifyPortalEntries` with a fixture provider and then loads the real providers against the private `config/portals.yml` to assert the seniority gate rejects director/VP/head/manager titles and that no tracked company is unclassified.
+**Purpose:** Two groups of checks. `fixtureTests` exercises `buildTitleFilter` (including whole-word short keywords such as `ETL`), `companyRoleKey` (only requisition tags stripped; `(Level 2)` vs `(Level 3)` distinct), leading-boundary positives (`IT Risk` vs `Credit Risk`, `Security` vs `Cybersecurity`) and the Workable, Pinpoint, SuccessFactors, Ashby and Greenhouse providers against in-memory HTTP contexts (`get`/`getJson` stubs recording the URLs they were asked for). `verifierTests` runs `verifyPortalEntries` with a fixture provider and then loads the real providers against the private `config/portals.yml` to assert the seniority gate rejects director/VP/head/manager titles and that no tracked company is unclassified.
 
 ## Run
 `node src/scan/test-scan-coverage.mjs` (also discovered by `node src/test-all.mjs`). Prints `scan coverage/provider tests OK`.
