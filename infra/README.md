@@ -52,7 +52,8 @@ regenerate the snapshot, then update `src/server/jobs-write.mjs`, `src/server/sc
   why), run `npm run db:migrate`, then `node src/helpers/db-schema.mjs` to regenerate `schema.sql`
   (`--check` verifies it; CI does). Test it with `node src/helpers/db-test.mjs`.
 - A migration that touches the dashboard tables is exercised by `src/helpers/test-rollback-rehearsal.mjs`
-  (apply, roll back, re-apply in a throwaway schema). Roll back on the personal database only with a
+  (apply, roll back, re-apply in a throwaway schema); the rollback scripts it runs are in
+  `infra/sql/rollback/`. Roll back on the personal database only with a
   fresh backup and the owner's go-ahead.
 
 ## Commands

@@ -1,7 +1,6 @@
-// Rehearses the additive-schema rollback of migrations 009 and 010 documented in
-// notes/dashboard-migration/design/ROLLBACK.md. The SQL that is rolled back is read from
-// that page, so the documented procedure is the tested procedure. Runs only in a unique schema of
-// the isolated test database; the personal database is never touched.
+// Rehearses the additive-schema rollback of migrations 009 and 010. The SQL that is rolled back
+// is read from infra/sql/rollback/, so the published procedure is the tested procedure. Runs only
+// in a unique schema of the isolated test database; the personal database is never touched.
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { readFileSync, readdirSync } from 'node:fs';
@@ -29,19 +28,10 @@ const migrationSql = prefix => {
   return { name, sql: readFileSync(join(migrations, name), 'utf8') };
 };
 
-// The documented block that follows a <!-- rollback:NNN --> marker.
-function rollbackBlock(markdown, id) {
-  const marker = `<!-- rollback:${id} -->`;
-  const at = markdown.indexOf(marker);
-  if (at < 0) throw new Error('ROLLBACK.md has no marker ' + marker);
-  const match = /```sql\r?\n([\s\S]*?)```/.exec(markdown.slice(at));
-  if (!match) throw new Error('ROLLBACK.md has no SQL block after ' + marker);
-  return match[1];
-}
-
-const page = readFileSync(join(root, 'notes/dashboard-migration/design/ROLLBACK.md'), 'utf8');
-const rollback010 = rollbackBlock(page, '010');
-const rollback009 = rollbackBlock(page, '009');
+// The rollback script for one migration: a tracked file, so a fresh clone can rehearse it.
+const rollbackSql = id => readFileSync(join(root, 'infra/sql/rollback', id + '.sql'), 'utf8');
+const rollback010 = rollbackSql('010');
+const rollback009 = rollbackSql('009');
 
 const schema = 'test_rollback_' + randomUUID().replaceAll('-', '');
 const client = new pg.Client({ connectionString: url });

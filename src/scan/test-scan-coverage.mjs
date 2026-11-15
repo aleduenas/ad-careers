@@ -2,7 +2,7 @@
 
 import assert from 'assert';
 import { execFileSync } from 'child_process';
-import { mkdtempSync, readFileSync, rmSync, statSync } from 'fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, statSync } from 'fs';
 import { tmpdir } from 'os';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -288,19 +288,34 @@ async function verifierTests() {
     ['ok', 'rich-only', 'retired', 'unclassified'],
   );
 
-  const config = yaml.load(readFileSync(path.join(ROOT, 'config/portals.yml'), 'utf-8'));
+  // The private portals file is checked when it exists; a fresh clone has only the published
+  // example, which must still load and classify. The title cases below describe the private
+  // file's own seniority gate, so they run only against that file.
+  const ownPortals = path.join(ROOT, 'config/portals.yml');
+  const hasOwnPortals = existsSync(ownPortals);
+  const config = yaml.load(
+    readFileSync(
+      hasOwnPortals ? ownPortals : path.join(ROOT, 'config/examples/portals.example.yml'),
+      'utf-8',
+    ),
+  );
   const realProviders = await loadProviders();
   const titleFilter = buildTitleFilter(config.title_filter);
-  for (const title of [
-    'Director, Data Engineering',
-    'Vice President, Enterprise AI Platforms',
-    'Head of Vulnerability Management',
-    'Senior Manager, Data Engineering',
-    'Chief Information Security Officer',
-  ])
-    assert.equal(titleFilter(title), false, `seniority gate should reject: ${title}`);
-  assert.equal(titleFilter('Senior Security Engineer'), true);
-  assert.equal(titleFilter('Senior Security Engineer, Vulnerability Management'), true);
+  if (hasOwnPortals) {
+    for (const title of [
+      'Director, Data Engineering',
+      'Vice President, Enterprise AI Platforms',
+      'Head of Vulnerability Management',
+      'Senior Manager, Data Engineering',
+      'Chief Information Security Officer',
+    ])
+      assert.equal(titleFilter(title), false, `seniority gate should reject: ${title}`);
+    assert.equal(titleFilter('Senior Security Engineer'), true);
+    assert.equal(titleFilter('Senior Security Engineer, Vulnerability Management'), true);
+  } else {
+    assert.equal(titleFilter('Security Engineer'), true);
+    assert.equal(titleFilter('Director of Engineering'), false);
+  }
   assert(config.tracked_companies.length > 0, 'at least one portal is configured');
   assert.equal(
     config.tracked_companies.filter(
