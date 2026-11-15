@@ -1,5 +1,6 @@
 /* The providers page. */
 
+/* The providers page. */
 /* Package 3.7: Providers page */
 .providers-page {
   display: grid;
@@ -52,4 +53,40 @@
   border-color: var(--line);
   background: var(--paper-soft);
   color: var(--muted);
+}
+
+/* Must follow ".edit-card h3" (pages/workspace.css). */
+.providers-page h2,
+.providers-page h3 {
+  margin: 0;
+}
+
+/* Kept in this file, not in controls.css, to hold its place relative to ".source-badge, .readiness-badge". */
+/* Must follow ".provider-row, .readiness-row" (pages/providers.css). */
+.readiness-notLoggedIn,
+.readiness-unavailable {
+  border-color: var(--red);
+  background: var(--red-bg);
+  color: var(--red);
+}
+
+/* Must follow ".source-badge, .readiness-badge" (pages/providers.css). */
+.readiness-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+}
+
+/* Must follow ".provider-list, .readiness-list" (pages/providers.css). */
+.readiness-help {
+  grid-column: 1 / -1;
+  margin: 0;
+  font-size: 13px;
+}
+
+/* Must follow ".provider-list, .readiness-list" (pages/providers.css). */
+.readiness-message {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
 }

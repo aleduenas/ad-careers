@@ -1,5 +1,6 @@
 /* The QuickMoves component. */
 
+/* The QuickMoves component. */
 /* Package 4.3 F31 to F33: quick status buttons and a compact Jobs toolbar. */
 .quick-moves {
   display: grid;
@@ -35,12 +36,6 @@
   border-color: var(--red);
   background: var(--red-bg);
   color: var(--red);
-}
-
-.quick-move-reject:hover:not(:disabled),
-.quick-move-reject.is-confirming {
-  background: var(--red);
-  color: var(--paper);
 }
 
 .quick-move-notice {

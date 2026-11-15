@@ -11,7 +11,6 @@ import { api } from '../../lib/client';
 import { isObject } from '../../lib/errors';
 import { trapTab } from '../../lib/hooks';
 import { providerLabels } from '../../lib/providers';
-import './batch.css';
 
 /** What the dialog was opened for. "custom" holds the amount field itself. */
 export type BatchIntent =

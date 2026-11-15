@@ -1,0 +1,18 @@
+/* Application-shell rules that must load after rules in files the shell file precedes. Each rule names the rule it must follow; keep this file last. */
+
+@media (min-width: 701px) {
+/* Must follow ".report-prose > :first-child" (pages/workspace.css). */
+/* Must follow ".report-prose > :first-child" (pages/workspace.css). */
+.is-workspace .brand {
+    justify-content: center;
+    margin-bottom: 14px;
+  }
+}
+
+/* Must follow ".notice button" (controls.css). */
+/* Must follow ".notice button" (controls.css). */
+.build-banner button {
+  min-height: 32px;
+  flex: none;
+  padding: 4px 12px;
+}

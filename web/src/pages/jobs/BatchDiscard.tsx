@@ -2,7 +2,6 @@ import { useState, type RefObject } from 'react';
 import { ApiFailure, conflictCode } from '../../api';
 import { api } from '../../lib/client';
 import { DiscardDialog } from '../../components/DiscardDialog';
-import './batch.css';
 
 /** A row picked for discarding: its id, the revision the list showed, and its name. */
 export interface DiscardTarget {

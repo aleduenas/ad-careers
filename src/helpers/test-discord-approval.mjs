@@ -49,6 +49,8 @@ test('the lead check alone, or a check by anyone else, approves nothing', async 
     false,
   );
   assert.equal((await checkApproval(fake(), config, message)).approved, false);
+  // The owner's check on a message the lead did not offer as a decision approves nothing.
+  assert.equal((await checkApproval(fake({ reactors: [owner] }), config, message)).approved, false);
 });
 
 test('a check on a message the lead did not write is refused', async () => {

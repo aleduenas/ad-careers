@@ -335,17 +335,74 @@ const API_CHECKS = [
 
 const CHALLENGE =
   /just a moment|cf-chl|captcha|verify you are human|access denied|px-captcha|attention required|enable javascript and cookies/i;
+// Statements that the posting is closed now: perfect or negative forms only.
 const CLOSURE = new RegExp(
   [
-    // Whole phrases about the posting itself; "no longer available" alone is too loose.
     'no longer accepting applications',
-    '(?:this|the) (?:job|position|posting|role|vacancy) (?:is|has been|was) (?:closed|filled|removed|cancelled|canceled|expired|no longer (?:available|open))',
-    '(?:this|the) (?:job|position|posting|role|vacancy) has expired',
+    '(?:this|the) (?:job|position|posting|role|vacancy) (?:has been|was) (?:closed|filled|removed|cancelled|canceled|expired)',
+    '(?:this|the) (?:job|position|posting|role|vacancy) has (?:closed|expired)',
+    '(?:this|the) (?:job|position|posting|role|vacancy) is no longer (?:available|open)',
+    '(?:this|the) (?:job|position|role) is not available',
     'applications? (?:for this (?:job|position|role) )?(?:are|is) (?:now )?closed',
-    'this (?:job|position|role) is (?:not|no longer) (?:available|open)',
   ].join('|'),
-  'i',
+  'gi',
 );
+// A bare "is closed/filled/expired" counts only as a whole sentence of its own.
+const BARE_CLOSURE =
+  /(?:this|the) (?:job|position|posting|role|vacancy) is (?:closed|filled|expired)\b/gi;
+// A condition ("until the position is filled") is not a statement that the posting is closed.
+const CONDITION = /\b(?:until|once|when|after|if|unless|before|as soon as)\b/i;
+
+function sentenceLead(text, index) {
+  const before = text.slice(0, index);
+  const cut = Math.max(...['.', '!', '?', ':', ';'].map(mark => before.lastIndexOf(mark)));
+  return before.slice(cut + 1);
+}
+
+/** The first closure phrase in visible text, or null. */
+export function closurePhrase(text) {
+  for (const [pattern, bare] of [
+    [CLOSURE, false],
+    [BARE_CLOSURE, true],
+  ]) {
+    for (const match of text.matchAll(pattern)) {
+      const lead = sentenceLead(text, match.index);
+      if (bare && lead.trim() !== '') continue;
+      if (CONDITION.test(lead.slice(-40))) continue;
+      // What follows in the same sentence: a qualified statement ("closed to candidates...",
+      // "no longer open to remote...") is not a notice, and a bare form must end its sentence.
+      const tail = text.slice(match.index + match[0].length).split(/[.!?]/)[0];
+      if (bare ? tail.trim() !== '' : /^\s+(?:from|to|on|for)\s+\S/i.test(tail)) continue;
+      return match[0];
+    }
+  }
+  return null;
+}
+
+/**
+ * Where a site puts a closure notice: the page title, the first headings and the opening 300
+ * characters of the main text (script, style, nav, header and footer removed). Never the body of
+ * the description.
+ */
+export function noticeSegments(html) {
+  const source = String(html);
+  const main = source.replace(
+    /<(script|style|noscript|nav|header|footer|select|option)\b[\s\S]*?<\/\1>/gi,
+    ' ',
+  );
+  const plain = fragment =>
+    fragment
+      .replace(/<[^>]+>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  const segments = [];
+  const title = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(source);
+  if (title) segments.push(plain(title[1]));
+  for (const heading of [...main.matchAll(/<h[12]\b[^>]*>([\s\S]*?)<\/h[12]>/gi)].slice(0, 3))
+    segments.push(plain(heading[1]));
+  segments.push(plain(main).slice(0, 300));
+  return segments.filter(Boolean);
+}
 
 const visibleText = html =>
   String(html)
@@ -393,8 +450,8 @@ function jobToken(url) {
 /** Positive signs of closure in a rendered page; null when there are none. */
 export function closureSigns({ url, finalUrl, html, now = Date.now() }) {
   if (expired(html, now)) return 'The structured job data shows a passed expiry date.';
-  const phrase = CLOSURE.exec(visibleText(html));
-  if (phrase) return `The page says: "${phrase[0]}".`;
+  const phrase = noticeSegments(html).map(closurePhrase).find(Boolean);
+  if (phrase) return `The page says: "${phrase}".`;
   if (finalUrl) {
     const token = jobToken(url);
     if (token && !finalUrl.toLowerCase().includes(token.toLowerCase()))

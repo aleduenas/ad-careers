@@ -2234,9 +2234,9 @@ test('liveness: POST /runs accepts the liveness variant and GET /liveness/summar
   });
 });
 
-test('the daily posting check is off by default: the switch is false and guards the only start call', async () => {
+test('the daily posting check has one switch, on by the owner decision, guarding the only start call', async () => {
   const { LIVENESS_DAILY_ENABLED } = await import('./app.mjs');
-  assert.equal(LIVENESS_DAILY_ENABLED, false);
+  assert.equal(LIVENESS_DAILY_ENABLED, true);
   const source = await readFile(new URL('./app.mjs', import.meta.url), 'utf8');
   const starts = source.match(/livenessService\.start\(\)/g) ?? [];
   assert.equal(starts.length, 1);
@@ -2245,4 +2245,68 @@ test('the daily posting check is off by default: the switch is false and guards 
     source,
     /if \(LIVENESS_DAILY_ENABLED && livenessService[^)]*\)\s*livenessService\.start\(\)/,
   );
+});
+
+test('D125 the run request accepts locationConfirmed and the run item serializes detail', async () => {
+  const seen = [];
+  const runs = injectedRuns({
+    dispatch: async input => {
+      seen.push(input);
+      return { runs: [runFixture({ requestKey: input.requestKey })], replayed: false };
+    },
+    get: async id => ({
+      run: runFixture({
+        id,
+        state: 'failed',
+        exitCode: 2,
+        errorCode: 'LOCATION_REVIEW',
+        detail: 'US only',
+      }),
+    }),
+    list: async () => ({
+      runs: [
+        runFixture({
+          state: 'failed',
+          exitCode: 2,
+          errorCode: 'LOCATION_REVIEW',
+          detail: 'US only',
+        }),
+      ],
+    }),
+  });
+  await withApp({ nonce: NONCE, runsService: runs }, async app => {
+    const post = payload =>
+      app.inject({ method: 'POST', url: '/api/v1/runs', headers: postHeaders, payload });
+    const ok = await post(
+      JSON.stringify({
+        action: 'evaluate',
+        jobId: '12',
+        requestKey: 'lc-k',
+        locationConfirmed: true,
+      }),
+    );
+    assert.equal(ok.statusCode, 201);
+    assert.equal(seen[0].locationConfirmed, true);
+    for (const body of [
+      { action: 'evaluate', jobId: '12', requestKey: 'k', locationConfirmed: 'yes' },
+      { action: 'evaluate', jobId: '12', requestKey: 'k', locationConfirmed: true, extra: 1 },
+    ])
+      assert.equal((await post(JSON.stringify(body))).statusCode, 400);
+    const one = await app.inject({
+      method: 'GET',
+      url: '/api/v1/runs/11111111-2222-4333-8444-555555555555',
+      headers: { host },
+    });
+    assert.equal(JSON.parse(one.body).data.run.detail, 'US only');
+    const list = await app.inject({ method: 'GET', url: '/api/v1/runs', headers: { host } });
+    assert.equal(JSON.parse(list.body).data.runs[0].detail, 'US only');
+    // The batch endpoint does not take it.
+    const batch = await app.inject({
+      method: 'POST',
+      url: '/api/v1/runs/evaluate-batch',
+      headers: postHeaders,
+      payload: JSON.stringify({ requestKey: 'b', next: 1, locationConfirmed: true }),
+    });
+    assert.equal(batch.statusCode, 400);
+  });
 });

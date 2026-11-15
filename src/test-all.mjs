@@ -176,6 +176,18 @@ if (QUICK) {
   else fail('Web production build failed');
 }
 
+// One stylesheet system: every rule is loaded through web/src/styles.css, imported once by the
+// entry file. A CSS import in any other module would bring back a second, order-dependent one.
+const strayCssImports = walkWebFiles(join(ROOT, 'web/src'), 'web/src').filter(
+  file =>
+    /\.tsx?$/.test(file) &&
+    file !== 'web/src/main.tsx' &&
+    /^\s*import\s+(?:[^'"\n]*from\s+)?['"][^'"\n]+\.css['"]/m.test(readFile(file)),
+);
+if (strayCssImports.length)
+  fail('CSS imported outside web/src/main.tsx: ' + strayCssImports.slice(0, 3).join(', '));
+else pass('Stylesheets load only through web/src/styles.css');
+
 // ── 4. DATA CONTRACT ────────────────────────────────────────────
 
 console.log('\n4. Data contract validation');
@@ -275,7 +287,8 @@ for (const pattern of absPatterns) {
   if (result) {
     for (const line of result.split('\n').filter(Boolean)) {
       const file = line.split(':')[0].replace(/\\/g, '/');
-      if (absAllowed.some(a => file.includes(a))) continue;
+      // Exact names only: a folder README is checked like any other file.
+      if (absAllowed.includes(file)) continue;
       fail(`Absolute path: ${line.slice(0, 120)}`);
       absFound = true;
     }

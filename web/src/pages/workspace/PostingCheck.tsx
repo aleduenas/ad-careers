@@ -3,7 +3,6 @@ import type { DetailJob } from '../../api';
 import { api } from '../../lib/client';
 import { formatDate, formatDateTime } from '../../lib/format';
 import { postingActionText, postingCheckError, postingStateText } from '../../lib/posting';
-import './posting-check.css';
 
 const POLL_MS = 3000;
 
@@ -57,7 +56,10 @@ export function PostingFact({
           }
           setRunId(null);
           if (run.state === 'completed') setMessage('The posting check finished.');
-          else setProblem('The posting check did not finish. See the Tasks page.');
+          else {
+            setMessage(null);
+            setProblem('The posting check did not finish. See the Tasks page.');
+          }
           void done.current();
         },
         () => {
@@ -89,6 +91,7 @@ export function PostingFact({
       setRunId(result.data.runs[0].id);
       setMessage('Checking the posting…');
     } catch (failure) {
+      setMessage(null);
       setProblem(postingCheckError(failure));
     } finally {
       setBusy(false);
@@ -107,7 +110,11 @@ export function PostingFact({
           : 'Not checked yet'}
       </span>
       {posting && posting.action !== 'none' && (
-        <small className="posting-fact-action">{postingActionText[posting.action]}</small>
+        <small className="posting-fact-action">
+          {posting.action === 'discarded' && job.status !== 'Discarded'
+            ? 'Discarded by this check, since moved back'
+            : postingActionText[posting.action]}
+        </small>
       )}
       {nonce && (
         <button

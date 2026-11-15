@@ -679,7 +679,8 @@ function isRunRecord(run: unknown): boolean {
     typeof run.action === 'string' &&
     ['queued', 'running', 'completed', 'failed', 'interrupted'].includes(run.state as string) &&
     typeof run.phase === 'string' &&
-    typeof run.createdAt === 'string'
+    typeof run.createdAt === 'string' &&
+    (run.detail === undefined || (typeof run.detail === 'string' && run.detail.length <= 300))
   );
 }
 

@@ -7,7 +7,6 @@ import {
   NO_REASON,
 } from '../lib/discard';
 import { trapTab } from '../lib/hooks';
-import './discard-dialog.css';
 
 const SHOW_REMAINING_AT = 40;
 
@@ -19,6 +18,7 @@ const SHOW_REMAINING_AT = 40;
 export function DiscardDialog({
   title,
   description,
+  initialReason = null,
   count = 1,
   busy,
   busyLabel = 'Discarding…',
@@ -28,6 +28,8 @@ export function DiscardDialog({
 }: {
   title: string;
   description?: ReactNode;
+  /** A reason that starts ticked (for example "Wrong location"); it can be changed or cleared. */
+  initialReason?: string | null;
   /** How many jobs this discards; the confirm button says so when it is more than one. */
   count?: number;
   busy: boolean;
@@ -38,7 +40,7 @@ export function DiscardDialog({
 }) {
   const ref = useRef<HTMLDialogElement | null>(null);
   const confirmButton = useRef<HTMLButtonElement | null>(null);
-  const [chosen, setChosen] = useState<string | null>(null);
+  const [chosen, setChosen] = useState<string | null>(initialReason);
   const [comment, setComment] = useState('');
   useEffect(() => {
     const dialog = ref.current;

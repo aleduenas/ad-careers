@@ -1,5 +1,16 @@
 /* Shared controls and surfaces used by more than one page: buttons, notices, tables, forms, chips. */
 
+/* Kept in this file, not in pages/jobs.css, to hold its place relative to ".edit-card label". */
+.search-control,
+.jobs-controls > label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+/* Shared controls and surfaces used by more than one page: buttons, notices, tables, forms, chips. */
 .quiet-button {
   background: transparent;
   color: var(--muted);
@@ -284,44 +295,44 @@ dialog.dialog:not([open]) {
 }
 
 @media (max-width: 1100px) {
-  .status-grid {
+.status-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 700px) {
-  .capability-card {
+.capability-card {
     align-items: flex-start;
     flex-direction: column;
     gap: 15px;
     padding: 18px;
   }
 
-  .section-heading {
+.section-heading {
     align-items: flex-start;
   }
 
-  .status-grid {
+.status-grid {
     grid-template-columns: minmax(0, 1fr);
     gap: 10px;
   }
 
-  .status-card {
+.status-card {
     min-height: 88px;
   }
 
-  .notice {
+.notice {
     align-items: flex-start;
     flex-direction: column;
     gap: 12px;
     padding: 14px;
   }
 
-  .notice button {
+.notice button {
     align-self: flex-start;
   }
 
-  .dialog {
+.dialog {
     padding: 21px 18px;
   }
 }
@@ -445,12 +456,6 @@ dialog.dialog:not([open]) {
   gap: 22px;
 }
 
-.pane-tabs [aria-selected='true'] {
-  border-color: var(--green);
-  color: var(--green);
-  font-weight: 700;
-}
-
 .doc-text {
   max-height: 70vh;
   margin: 0;
@@ -516,11 +521,11 @@ dialog.dialog:not([open]) {
 }
 
 @media (max-width: 700px) {
-  .history-table {
+.history-table {
     min-width: 0;
   }
 
-  .history-table th,
+.history-table th,
   .history-table td {
     padding: 8px 8px;
   }
@@ -586,12 +591,12 @@ dialog.dialog:not([open]) {
 }
 
 @media (max-width: 700px) {
-  .history-table th,
+.history-table th,
   .history-table td {
     overflow-wrap: break-word;
   }
 
-  .history-table th {
+.history-table th {
     white-space: nowrap;
   }
 }
@@ -645,11 +650,11 @@ dialog.dialog:not([open]) {
 }
 
 @media (max-width: 700px) {
-  .provider-fields {
+.provider-fields {
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .provider-fields .primary-button {
+.provider-fields .primary-button {
     width: 100%;
   }
 }
@@ -697,7 +702,7 @@ dialog.dialog:not([open]) {
 }
 
 @media (max-width: 1100px) {
-  .col-minor {
+.col-minor {
     display: none;
   }
 }
@@ -737,16 +742,6 @@ fieldset legend {
   font-weight: 700;
 }
 
-.ws .doc-pane,
-.ws .workspace-section,
-.ws-panel .edit-card {
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
-}
-
 .ws .doc-text,
 .ws .report-prose {
   max-height: none;
@@ -782,11 +777,62 @@ fieldset legend {
 }
 
 @media (max-width: 1023px) {
-  .app-shell.has-banner .ws .doc-pane > h3 {
+.app-shell.has-banner .ws .doc-pane > h3 {
     top: var(--banner-h);
   }
 }
 
 .status-chips {
   margin: 0;
+}
+
+/* Kept in this file, not in pages/jobs.css, to hold its place relative to ".dialog dl > div:last-child". */
+.jobs-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+/* Kept in this file, not in pages/jobs.css, to hold its place relative to ".file-list strong, .file-list span". */
+.job-name strong,
+.job-name span,
+.compensation-cell span,
+.compensation-cell small,
+.date-cell span {
+  display: block;
+}
+
+/* Kept in this file, not in pages/jobs.css, to hold its place relative to ".empty-state h3". */
+.job-group h3 {
+  margin: 0 0 8px;
+  color: var(--green);
+  font-size: 14px;
+}
+
+/* Kept in this file, not in pages/service.css, to hold its place relative to ".panel-card .section-heading". */
+.connection-summary > .section-heading {
+  margin-bottom: 14px;
+}
+
+/* Order-bound rules. Each rule here targets the same element and specificity as an earlier rule in another file (or
+  is followed by such a rule), so it keeps its original position, after every file above. Do not reorder. */
+/* Must follow ".connection-summary > .section-heading" (pages/service.css). */
+.panel-card .section-heading {
+  margin-bottom: 14px;
+}
+
+/* Must follow ".job-group h3" (pages/jobs.css). */
+.empty-state h3 {
+  color: var(--ink);
+  font-size: 16px;
+}
+
+/* Must follow ".jobs-table tbody tr:last-child > *" (pages/jobs.css). */
+.history-table tbody tr:last-child > * {
+  border-bottom: 0;
+}
+
+/* Must follow ".job-name strong, .job-name span, .compensation-cell span, ." (pages/jobs.css). */
+.file-list strong,
+.file-list span {
+  display: block;
+  overflow-wrap: anywhere;
 }

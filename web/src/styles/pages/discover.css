@@ -1,5 +1,6 @@
 /* The discover page. */
 
+/* The discover page. */
 /* Package 3.3: Discover page */
 .discover-grid {
   display: grid;
@@ -37,8 +38,32 @@
 }
 
 @media (min-width: 1024px) {
-  .discover-grid {
+.discover-grid {
     grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
     align-items: start;
   }
+}
+
+/* Must follow ".jobs-toolbar p" (pages/jobs.css). */
+.discover-card h3,
+.discover-card h4,
+.discover-card p {
+  margin: 0;
+}
+
+/* Must follow ".discover-card h3, .discover-card h4, .discover-card p" (also in this file). */
+.discover-card h4 {
+  margin-top: 6px;
+}
+
+/* Must follow ".search-control input, .jobs-controls select" (pages/jobs.css). */
+.url-row input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Kept in this file, not in components/SlidePanel.css, to hold its place relative to ".discover-card h3, .discover-card h4, .discover-ca". */
+/* Must follow ".job-group h3" (pages/jobs.css). */
+.ws-panel-body h3 {
+  margin: 0 0 10px;
 }

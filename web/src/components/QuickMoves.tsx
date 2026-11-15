@@ -88,6 +88,7 @@ export function QuickMoves({
   onConflict,
   onNotice,
   evaluate,
+  fastDiscard: allowFastDiscard = false,
 }: {
   job: { id: string; status: string; revision: string };
   nonce: string;
@@ -98,6 +99,8 @@ export function QuickMoves({
   onNotice?: (message: string | null) => void;
   /** Present when evaluations can be dispatched from here; Pending jobs show Evaluate. */
   evaluate?: QuickEvaluate | null;
+  /** Jobs list rows only: a double click on Discard discards at once, without the popout. */
+  fastDiscard?: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [confirming, setConfirming] = useState(false);
@@ -207,7 +210,11 @@ export function QuickMoves({
             className="quick-move quick-move-reject"
             disabled={busy}
             aria-label="Discard"
-            title="Click for reasons, double-click to discard now"
+            title={
+              allowFastDiscard
+                ? 'Click for reasons, double-click to discard now'
+                : 'Discard this job'
+            }
             onClick={event => {
               window.clearTimeout(discardClick.current);
               // The second click of a double click is handled by onDoubleClick.
@@ -218,10 +225,11 @@ export function QuickMoves({
                 setDiscarding(true);
               };
               // Keyboard activation (no click count) opens the popout at once, never the fast path.
-              if (event.detail === 0) open();
+              if (event.detail === 0 || !allowFastDiscard) open();
               else discardClick.current = window.setTimeout(open, DOUBLE_CLICK_MS);
             }}
             onDoubleClick={() => {
+              if (!allowFastDiscard) return;
               window.clearTimeout(discardClick.current);
               if (busy || fastDiscard.current) return;
               fastDiscard.current = true;

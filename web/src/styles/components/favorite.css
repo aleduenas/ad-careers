@@ -1,5 +1,6 @@
-/* The favorite star on Jobs rows and in the workspace header. */
+/* The favorite component. */
 
+/* The favorite star on Jobs rows and in the workspace header. */
 .favorite-wrap {
   display: inline-flex;
   flex-wrap: wrap;

@@ -10,9 +10,15 @@
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36';
 
+// The default headless build is chrome-headless-shell.exe, a console-subsystem program. Playwright
+// spawns it without windowsHide, and the run service starts this worker detached (no console), so
+// Windows opens an empty console window for it. The "chromium" channel is the new headless mode in
+// chrome.exe, a GUI-subsystem program that never creates a console.
+export const LAUNCH_OPTIONS = Object.freeze({ headless: true, channel: 'chromium' });
+
 async function launchChromium() {
   const { chromium } = await import('playwright');
-  return chromium.launch({ headless: true });
+  return chromium.launch({ ...LAUNCH_OPTIONS });
 }
 
 export function createRenderer({ launch = launchChromium, settleMs = 1200 } = {}) {

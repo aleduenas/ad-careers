@@ -10,7 +10,6 @@ import {
   type DiscardOutcome,
   type DiscardTarget,
 } from './BatchDiscard';
-import './batch.css';
 
 const NEXT_DEFAULT = 10;
 const POLL_MS = 4000;

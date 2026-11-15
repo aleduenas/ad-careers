@@ -15,13 +15,28 @@ const runId = process.env.CAREER_RUN_ID || '';
 const RUN_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 let installed = false;
 let outcomeCode = null;
+let outcomeDetail = null;
+export const MAX_OUTCOME_DETAIL = 300;
 
 // A launcher whose non-zero exit is an expected outcome (for example a job that needs a location
 // decision) names it here; the terminal report then carries this code instead of EXIT_NONZERO.
 // The state stays `failed` and the exit code is unchanged. Ignored on exit code 0.
-export function setRunOutcome(errorCode) {
+// `detail` is a short human reason (for example the location gate's), stored only in the task
+// record: control characters stripped, capped at 300 characters.
+export function setRunOutcome(errorCode, detail) {
+  outcomeDetail = cleanDetail(detail);
   outcomeCode =
     typeof errorCode === 'string' && /^[A-Z][A-Z0-9_]{1,39}$/.test(errorCode) ? errorCode : null;
+}
+
+export function cleanDetail(value) {
+  if (typeof value !== 'string') return null;
+  // eslint-disable-next-line no-control-regex
+  const text = value
+    .replace(/[\u0000-\u001f\u007f-\u009f]+/g, ' ')
+    .replace(/ {2,}/g, ' ')
+    .trim();
+  return text ? [...text].slice(0, MAX_OUTCOME_DETAIL).join('') : null;
 }
 
 export function terminalErrorCode(exitCode) {
@@ -133,6 +148,7 @@ export function install() {
       state: code === 0 ? 'completed' : 'failed',
       exit_code: code,
       ...(code !== 0 && outcomeCode ? { error_code: outcomeCode } : {}),
+      ...(code !== 0 && outcomeCode && outcomeDetail ? { detail: outcomeDetail } : {}),
       finished_at: new Date().toISOString(),
     });
   });

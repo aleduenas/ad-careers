@@ -14,7 +14,7 @@ import { useConnection } from './lib/connection';
 import { ServicePage } from './pages/service/ServicePage';
 import { useTasksLocation, TasksPage } from './pages/tasks/TasksPage';
 import { PageBoundary } from './components/PageBoundary';
-import './styles.css';
+import { CapabilitiesContext } from './lib/capabilities';
 
 function App() {
   const [page, jobId] = usePage();
@@ -137,218 +137,222 @@ function App() {
     </button>
   );
   return (
-    <div
-      className={`app-shell${inWorkspace ? ' is-workspace' : ''}${staleBuild ? ' has-banner' : ''}`}
-      data-service={serviceState}
+    <CapabilitiesContext.Provider
+      value={{ dispatchNonce: dispatch?.nonce ?? null, writerNonce: writer?.nonce ?? null }}
     >
-      {staleBuild && (
-        <div className="build-banner" role="alert">
-          <span>{bannerMessage}</span>
-          {buildRel === 'pageOlder' && (
-            <button className="quiet-button" onClick={() => location.reload()}>
-              Reload
-            </button>
-          )}
-          <button className="quiet-button" onClick={() => setDismissedBuild(bannerMessage)}>
-            Dismiss
-          </button>
-        </div>
-      )}
-      <a
-        className="skip-link"
-        href="#main"
-        onClick={event => {
-          event.preventDefault();
-          document.getElementById('main')?.focus();
-        }}
+      <div
+        className={`app-shell${inWorkspace ? ' is-workspace' : ''}${staleBuild ? ' has-banner' : ''}`}
+        data-service={serviceState}
       >
-        Skip to content
-      </a>
-      <aside className="sidebar" aria-label="Application sidebar">
-        <a className="brand" href="#/overview">
-          <span className="brand-mark" aria-hidden="true">
-            co
-          </span>
-          <span>
-            career-ops<small>Local workspace</small>
-          </span>
-        </a>
-        <p className="nav-heading">WORKSPACE</p>
-        <nav aria-label="Main navigation">
-          {pages
-            .filter(item => item.id !== 'providers' || providersAvailable !== false)
-            .filter(item => item.id !== 'cost' || costAvailable === true)
-            .map(item => (
-              <a
-                key={item.id}
-                href={`${location.search}#/${item.id}`}
-                title={item.label}
-                aria-current={page === item.id ? 'page' : undefined}
-                onFocus={event => {
-                  const link = event.currentTarget;
-                  const nav = link.parentElement;
-                  if (!nav || nav.scrollWidth <= nav.clientWidth) return;
-                  const keepFocusedLinkVisible = () => {
-                    if (!link.isConnected || document.activeElement !== link) return;
-                    const navBounds = nav.getBoundingClientRect();
-                    const linkBounds = link.getBoundingClientRect();
-                    const focusClearance = 7;
-                    if (linkBounds.left < navBounds.left + focusClearance) {
-                      nav.scrollLeft -= navBounds.left + focusClearance - linkBounds.left;
-                    } else if (linkBounds.right > navBounds.right - focusClearance) {
-                      nav.scrollLeft += linkBounds.right - navBounds.right + focusClearance;
-                    }
-                  };
-                  window.requestAnimationFrame(() => {
-                    window.requestAnimationFrame(keepFocusedLinkVisible);
-                  });
-                }}
-              >
-                <span aria-hidden="true">{item.icon}</span>
-                {item.label}
-                {item.id === 'service' && serviceFailing && (
-                  <span className="nav-dot" role="img" aria-label="Needs attention" />
-                )}
-                {item.id === 'tasks' && activeRunCount > 0 && (
-                  <span className="nav-count">
-                    <span aria-hidden="true">{activeRunCount}</span>
-                    <span className="visually-hidden">
-                      {' '}
-                      ({activeRunCount} active {activeRunCount === 1 ? 'run' : 'runs'})
-                    </span>
-                  </span>
-                )}
-              </a>
-            ))}
-        </nav>
-        <div className="sidebar-foot">
-          <span className="local-pip" /> Local workspace<p>Thoughtful work, at your pace.</p>
-        </div>
-      </aside>
-      <div className="main-shell">
-        {!inWorkspace && (
-          <header className="topbar">
-            <p>
-              Workspace <span aria-hidden="true">/</span> <strong>{title}</strong>
-            </p>
-            <div className="top-actions">
-              <button
-                className="theme-button"
-                onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                aria-label={`Use ${theme === 'light' ? 'dark' : 'light'} theme`}
-              >
-                <span aria-hidden="true">Aa</span>
-                <span>Use {theme === 'light' ? 'dark' : 'light'} theme</span>
+        {staleBuild && (
+          <div className="build-banner" role="alert">
+            <span>{bannerMessage}</span>
+            {buildRel === 'pageOlder' && (
+              <button className="quiet-button" onClick={() => location.reload()}>
+                Reload
               </button>
-            </div>
-          </header>
-        )}
-        <main id="main" tabIndex={-1} data-page={page}>
-          {!inWorkspace && page !== 'jobs' && (
-            <div className="page-heading">
-              <div>
-                <p className="eyebrow">CAREER-OPS / WORKSPACE</p>
-                <h1>{title}</h1>
-                <p className="lead">{lead}</p>
-              </div>
-            </div>
-          )}
-          {healthError && (
-            <div className="notice notice-error" role="alert">
-              <div>
-                <strong>
-                  {healthError.network
-                    ? 'Could not connect to the local service.'
-                    : 'The local health check failed.'}
-                </strong>
-                <p>{healthError.message} Check the local service, then retry.</p>
-              </div>
-              <button onClick={() => setRefreshKey(value => value + 1)}>Retry connection</button>
-            </div>
-          )}
-          <PageBoundary name={title} resetKey={`${page}/${jobId ?? ''}`}>
-            {page === 'overview' ? (
-              <OverviewPage refreshKey={dataEpoch} />
-            ) : page === 'cost' && costAvailable !== true ? (
-              <section className="capability-card">
-                <div>
-                  <span className="card-kicker">CURRENT AVAILABILITY</span>
-                  <h2>Cost is unavailable</h2>
-                  <p>
-                    {costAvailable === undefined
-                      ? 'Checking what this server offers…'
-                      : 'This server does not offer usage tracking.'}
-                  </p>
-                </div>
-                <span className="not-enabled">Unavailable</span>
-              </section>
-            ) : page === 'cost' ? (
-              <CostPage api={api} />
-            ) : page === 'providers' && providersAvailable === false ? (
-              <section className="capability-card">
-                <div>
-                  <span className="card-kicker">CURRENT AVAILABILITY</span>
-                  <h2>Providers is unavailable</h2>
-                  <p>This server does not offer provider settings.</p>
-                </div>
-                <span className="not-enabled">Unavailable</span>
-              </section>
-            ) : page === 'providers' ? (
-              <ProvidersPage nonce={sessionNonce} />
-            ) : page === 'service' ? (
-              <ServicePage
-                connection={connection}
-                loading={allLoading}
-                onRefresh={() => setRefreshKey(value => value + 1)}
-              />
-            ) : page === 'tasks' ? (
-              <TasksPage
-                monitor={monitor}
-                limit={tasksLocation.limit}
-                runId={tasksLocation.runId}
-                write={tasksLocation.write}
-                dispatch={dispatch}
-              />
-            ) : page === 'discover' ? (
-              <DiscoverPage caps={discoverCaps} />
-            ) : page === 'jobs' ? (
-              jobId ? (
-                <WorkspacePage
-                  id={jobId}
-                  key={jobId}
-                  writer={writer}
-                  dispatch={dispatch}
-                  onHeading={setWorkspaceHeading}
-                  chrome={chromeControls}
-                />
-              ) : (
-                <JobsPage
-                  refreshKey={dataEpoch}
-                  intake={discoverCaps?.intake ? { nonce: discoverCaps.nonce } : null}
-                  writer={writer}
-                  dispatch={dispatch}
-                />
-              )
-            ) : (
-              <section className="capability-card">
-                <div>
-                  <span className="card-kicker">CURRENT AVAILABILITY</span>
-                  <h2>{title} is unavailable</h2>
-                  <p>This area is not available in the current dashboard.</p>
-                </div>
-                <span className="not-enabled">Unavailable</span>
-              </section>
             )}
-          </PageBoundary>
-        </main>
-        {!inWorkspace && (
-          <footer>
-            <span>career-ops</span>
-            <span>Local browser workspace</span>
-          </footer>
+            <button className="quiet-button" onClick={() => setDismissedBuild(bannerMessage)}>
+              Dismiss
+            </button>
+          </div>
         )}
+        <a
+          className="skip-link"
+          href="#main"
+          onClick={event => {
+            event.preventDefault();
+            document.getElementById('main')?.focus();
+          }}
+        >
+          Skip to content
+        </a>
+        <aside className="sidebar" aria-label="Application sidebar">
+          <a className="brand" href="#/overview">
+            <span className="brand-mark" aria-hidden="true">
+              co
+            </span>
+            <span>
+              career-ops<small>Local workspace</small>
+            </span>
+          </a>
+          <p className="nav-heading">WORKSPACE</p>
+          <nav aria-label="Main navigation">
+            {pages
+              .filter(item => item.id !== 'providers' || providersAvailable !== false)
+              .filter(item => item.id !== 'cost' || costAvailable === true)
+              .map(item => (
+                <a
+                  key={item.id}
+                  href={`${location.search}#/${item.id}`}
+                  title={item.label}
+                  aria-current={page === item.id ? 'page' : undefined}
+                  onFocus={event => {
+                    const link = event.currentTarget;
+                    const nav = link.parentElement;
+                    if (!nav || nav.scrollWidth <= nav.clientWidth) return;
+                    const keepFocusedLinkVisible = () => {
+                      if (!link.isConnected || document.activeElement !== link) return;
+                      const navBounds = nav.getBoundingClientRect();
+                      const linkBounds = link.getBoundingClientRect();
+                      const focusClearance = 7;
+                      if (linkBounds.left < navBounds.left + focusClearance) {
+                        nav.scrollLeft -= navBounds.left + focusClearance - linkBounds.left;
+                      } else if (linkBounds.right > navBounds.right - focusClearance) {
+                        nav.scrollLeft += linkBounds.right - navBounds.right + focusClearance;
+                      }
+                    };
+                    window.requestAnimationFrame(() => {
+                      window.requestAnimationFrame(keepFocusedLinkVisible);
+                    });
+                  }}
+                >
+                  <span aria-hidden="true">{item.icon}</span>
+                  {item.label}
+                  {item.id === 'service' && serviceFailing && (
+                    <span className="nav-dot" role="img" aria-label="Needs attention" />
+                  )}
+                  {item.id === 'tasks' && activeRunCount > 0 && (
+                    <span className="nav-count">
+                      <span aria-hidden="true">{activeRunCount}</span>
+                      <span className="visually-hidden">
+                        {' '}
+                        ({activeRunCount} active {activeRunCount === 1 ? 'run' : 'runs'})
+                      </span>
+                    </span>
+                  )}
+                </a>
+              ))}
+          </nav>
+          <div className="sidebar-foot">
+            <span className="local-pip" /> Local workspace<p>Thoughtful work, at your pace.</p>
+          </div>
+        </aside>
+        <div className="main-shell">
+          {!inWorkspace && (
+            <header className="topbar">
+              <p>
+                Workspace <span aria-hidden="true">/</span> <strong>{title}</strong>
+              </p>
+              <div className="top-actions">
+                <button
+                  className="theme-button"
+                  onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
+                  aria-label={`Use ${theme === 'light' ? 'dark' : 'light'} theme`}
+                >
+                  <span aria-hidden="true">Aa</span>
+                  <span>Use {theme === 'light' ? 'dark' : 'light'} theme</span>
+                </button>
+              </div>
+            </header>
+          )}
+          <main id="main" tabIndex={-1} data-page={page}>
+            {!inWorkspace && page !== 'jobs' && (
+              <div className="page-heading">
+                <div>
+                  <p className="eyebrow">CAREER-OPS / WORKSPACE</p>
+                  <h1>{title}</h1>
+                  <p className="lead">{lead}</p>
+                </div>
+              </div>
+            )}
+            {healthError && (
+              <div className="notice notice-error" role="alert">
+                <div>
+                  <strong>
+                    {healthError.network
+                      ? 'Could not connect to the local service.'
+                      : 'The local health check failed.'}
+                  </strong>
+                  <p>{healthError.message} Check the local service, then retry.</p>
+                </div>
+                <button onClick={() => setRefreshKey(value => value + 1)}>Retry connection</button>
+              </div>
+            )}
+            <PageBoundary name={title} resetKey={`${page}/${jobId ?? ''}`}>
+              {page === 'overview' ? (
+                <OverviewPage refreshKey={dataEpoch} />
+              ) : page === 'cost' && costAvailable !== true ? (
+                <section className="capability-card">
+                  <div>
+                    <span className="card-kicker">CURRENT AVAILABILITY</span>
+                    <h2>Cost is unavailable</h2>
+                    <p>
+                      {costAvailable === undefined
+                        ? 'Checking what this server offers…'
+                        : 'This server does not offer usage tracking.'}
+                    </p>
+                  </div>
+                  <span className="not-enabled">Unavailable</span>
+                </section>
+              ) : page === 'cost' ? (
+                <CostPage api={api} />
+              ) : page === 'providers' && providersAvailable === false ? (
+                <section className="capability-card">
+                  <div>
+                    <span className="card-kicker">CURRENT AVAILABILITY</span>
+                    <h2>Providers is unavailable</h2>
+                    <p>This server does not offer provider settings.</p>
+                  </div>
+                  <span className="not-enabled">Unavailable</span>
+                </section>
+              ) : page === 'providers' ? (
+                <ProvidersPage nonce={sessionNonce} />
+              ) : page === 'service' ? (
+                <ServicePage
+                  connection={connection}
+                  loading={allLoading}
+                  onRefresh={() => setRefreshKey(value => value + 1)}
+                />
+              ) : page === 'tasks' ? (
+                <TasksPage
+                  monitor={monitor}
+                  limit={tasksLocation.limit}
+                  runId={tasksLocation.runId}
+                  write={tasksLocation.write}
+                  dispatch={dispatch}
+                />
+              ) : page === 'discover' ? (
+                <DiscoverPage caps={discoverCaps} />
+              ) : page === 'jobs' ? (
+                jobId ? (
+                  <WorkspacePage
+                    id={jobId}
+                    key={jobId}
+                    writer={writer}
+                    dispatch={dispatch}
+                    onHeading={setWorkspaceHeading}
+                    chrome={chromeControls}
+                  />
+                ) : (
+                  <JobsPage
+                    refreshKey={dataEpoch}
+                    intake={discoverCaps?.intake ? { nonce: discoverCaps.nonce } : null}
+                    writer={writer}
+                    dispatch={dispatch}
+                  />
+                )
+              ) : (
+                <section className="capability-card">
+                  <div>
+                    <span className="card-kicker">CURRENT AVAILABILITY</span>
+                    <h2>{title} is unavailable</h2>
+                    <p>This area is not available in the current dashboard.</p>
+                  </div>
+                  <span className="not-enabled">Unavailable</span>
+                </section>
+              )}
+            </PageBoundary>
+          </main>
+          {!inWorkspace && (
+            <footer>
+              <span>career-ops</span>
+              <span>Local browser workspace</span>
+            </footer>
+          )}
+        </div>
       </div>
-    </div>
+    </CapabilitiesContext.Provider>
   );
 }
 

@@ -1,5 +1,6 @@
 /* The SlidePanel component. */
 
+/* The SlidePanel component. */
 .ws-panel {
   position: fixed;
   z-index: 40;
@@ -39,7 +40,7 @@
 }
 
 @media (min-width: 1024px) {
-  .ws-panel {
+.ws-panel {
     inset: 0 68px 0 auto;
     width: min(50vw, 760px);
     border-left: 1px solid var(--line);
@@ -52,7 +53,7 @@
 }
 
 @media (min-width: 1024px) {
-  .ws-panel.ws-panel-solo {
+.ws-panel.ws-panel-solo {
     right: 0;
   }
 }

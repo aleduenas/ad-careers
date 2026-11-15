@@ -24,10 +24,8 @@ browser app simple to start on this Windows machine and safe to stop.
 - Test Windows process behavior and repository-root resolution, including paths with spaces.
 - Secrets stay out of commands, logs and responses. Test environments cannot touch the personal
   database or private work product; use the documented dry runs.
-- Keep `src/test-all.mjs` discovering new server and web checks. When the Go TUI is retired
-  (Stage 4), adapt checks before deleting their targets so `npm test` stays meaningful.
-- Any change under `dashboard/` while the TUI is retained requires `go build -o dashboard.exe .`
-  from `dashboard/`; if the running exe is locked, tell the lead to ask the user to close it.
+- Keep `src/test-all.mjs` discovering new server and web checks; adapt a check before deleting
+  its target so `npm test` stays meaningful. The Go TUI is retired and its folder is gone.
 - Documentation follows `AGENTS.md` rule 9: one concise README per folder, no new per-file
   pages, smallest edit to existing pages until the folder is converted.
 

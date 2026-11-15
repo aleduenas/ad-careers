@@ -1,5 +1,6 @@
-/* Posting check and experience lines in the job page facts and the Status panel. */
+/* The workspace-posting-check page. */
 
+/* Posting check and experience lines in the job page facts and the Status panel. */
 .ws-facts .posting-fact-action,
 .ws-facts .posting-fact-note {
   display: block;
@@ -8,8 +9,9 @@
 }
 
 .ws-facts .posting-check-button {
+  display: block;
   min-height: 30px;
-  margin-top: 4px;
+  margin-top: 6px;
   padding: 3px 9px;
   font-size: 12px;
 }

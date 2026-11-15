@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createRenderer } from './liveness-render.mjs';
+import { LAUNCH_OPTIONS, createRenderer } from './liveness-render.mjs';
 
 process.env.CAREER_OPS_TEST_GUARD = '1';
 
@@ -82,5 +82,8 @@ function fakeBrowser(status = 200, finalUrl = 'https://x.test/jobs') {
   assert.equal(await broken.renderPage('https://x.test'), null);
   await broken.close();
 }
+
+// The browser is the GUI-subsystem build, so a detached worker never opens a console window.
+assert.deepEqual({ ...LAUNCH_OPTIONS }, { headless: true, channel: 'chromium' });
 
 console.log('liveness render tests OK');

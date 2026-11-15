@@ -1,5 +1,6 @@
-/* Jobs search box: tips button, tips text and the server's message for a bad expression. */
+/* The jobs-search page. */
 
+/* Jobs search box: tips button, tips text and the server's message for a bad expression. */
 .jobs-toolbar .search-box {
   position: relative;
   display: block;
@@ -50,4 +51,22 @@
 
 .search-problem {
   color: var(--red);
+}
+
+.jobs-toolbar .jobs-filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 10px 18px;
+  margin-top: 10px;
+}
+
+.jobs-filter-row .compact-control input[type='number'] {
+  width: 96px;
+  min-height: 36px;
+}
+
+.jobs-filter-row .checkbox-control {
+  min-height: 36px;
+  align-items: center;
 }

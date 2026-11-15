@@ -12,9 +12,6 @@ import { yoeConfidenceText, yoeIsUncertain, yoeLabel } from '../../lib/yoe';
 import { postingIsClosed, postingStateText } from '../../lib/posting';
 import { PasteForm } from '../discover/PasteForm';
 import { BatchBar, canDiscardRow, canEvaluateRow } from './BatchBar';
-import './search.css';
-import './jobs-table.css';
-import './phase2.css';
 
 const SEARCH_PROBLEM_DELAY_MS = 500;
 
@@ -384,6 +381,7 @@ export function JobsPage({
                       onMoved={applyMoved}
                       onConflict={() => setRetry(value => value + 1)}
                       onNotice={setMoveNotice}
+                      fastDiscard
                       evaluate={
                         dispatch
                           ? {

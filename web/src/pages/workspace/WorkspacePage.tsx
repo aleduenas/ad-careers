@@ -1,6 +1,7 @@
 import { useEffect, useState, type KeyboardEvent, type ReactNode, type CSSProperties } from 'react';
 import { createPortal } from 'react-dom';
 import { SlidePanel } from '../../components/SlidePanel';
+import { JobLocationReview } from '../../components/LocationReview';
 import { materialHref } from '../../lib/materials';
 import { type EditContext } from './StatusControl';
 import { useLetter, LetterModal } from './LetterEditor';
@@ -171,6 +172,7 @@ export function WorkspacePage({
           document.body,
         )}
 
+      <JobLocationReview jobId={job.id} status={job.status} onChanged={() => void refresh()} />
       <div className="ws-body">
         <div className="ws-center">
           <div className="pane-tabs" role="tablist" aria-label="Job text">

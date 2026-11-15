@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import type { RunRecord, ScanReport, ProviderFunctionName, ProviderKey } from '../api';
 import { api } from './client';
-import './run-outcome.css';
 import { providerLabels, functionRows } from './providers';
 
 export const functionLabel = (name: ProviderFunctionName) =>

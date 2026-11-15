@@ -13,8 +13,8 @@ Node ESM server under `src/server/` that the browser talks to.
 ## Read first
 
 `AGENTS.md`, your package brief from the lead, `notes/dashboard-migration/design/API.md`
-and the contract the lead names (for example `design/STAGE2_READ_CONTRACT.md`). Read the Go code
-in `dashboard/` for the exact behavior you are porting; do not guess from the TUI README.
+and the contract the lead names (for example `design/STAGE2_READ_CONTRACT.md`). The Go TUI is
+retired; the browser dashboard and `src/README.md` are the reference for behaviour.
 
 ## Rules
 

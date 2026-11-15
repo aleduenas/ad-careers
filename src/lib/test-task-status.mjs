@@ -67,6 +67,19 @@ try {
   assert.equal(saved.state, 'failed');
   assert.equal(saved.exit_code, 2);
   assert.equal(saved.error_code, 'LOCATION_REVIEW');
+  // The outcome may carry a short detail (the gate reason): stripped, capped, record only.
+  saved = worker(
+    "setRunOutcome('LOCATION_REVIEW', 'US only\\u0007\\n  remote ' + 'x'.repeat(400));\nprocess.exitCode = 2;\n",
+  );
+  assert.equal(saved.error_code, 'LOCATION_REVIEW');
+  assert.equal(saved.detail.length, 300);
+  assert.ok(saved.detail.startsWith('US only remote x'), saved.detail);
+  saved = worker("setRunOutcome('LOCATION_REVIEW');\nprocess.exitCode = 2;\n");
+  assert.equal(saved.detail, undefined, 'no detail means no field');
+  const { cleanDetail } = await import('./_task-status.mjs');
+  assert.equal(cleanDetail('  a\u0000b\n\nc  '), 'a b c');
+  assert.equal(cleanDetail(''), null);
+  assert.equal(cleanDetail(42), null);
   saved = worker('process.exitCode = 2;\n');
   assert.equal(saved.error_code, undefined, 'without an outcome the code is the generic one');
   saved = worker("setRunOutcome('bad code');\nprocess.exitCode = 2;\n");

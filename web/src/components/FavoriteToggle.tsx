@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import { ApiFailure } from '../api';
 import { api } from '../lib/client';
-import './favorite.css';
 
 function failureText(failure: unknown): string {
   if (failure instanceof ApiFailure) {

@@ -455,8 +455,32 @@ cp.spawn=function(command,args,options){
     assert.deepEqual(researchNeeded(join(fixture, 'data/company-info/newco.md')), []);
     const outputs = readdirSync(join(fixture, 'data/evaluations'));
     assert.ok(outputs.some(s => s.startsWith('6-')));
+    // D125 --location-ok: valid only with --job; the gate still runs, and a REVIEW or FAIL
+    // verdict no longer stops that job. A job without the flag still waits for review.
+    run(['--next=1', '--location-ok'], 1);
+    run(['--select=Review', '--location-ok'], 1);
+    run(['--resume=' + id, '--location-ok'], 1);
+    run(['--job=4', '--location-ok=yes'], 1);
+    assert.equal((await q('SELECT status FROM jobs WHERE id=4'))[0].status, 'Pending');
+    run(['--job=4'], 2);
+    assert.equal((await q('SELECT status FROM jobs WHERE id=4'))[0].status, 'Pending');
+    const callsBeforeDry = calls().length;
+    run(['--job=4', '--location-ok', '--dry-run']);
+    assert.equal(calls().length, callsBeforeDry, 'dry-run with the flag calls no worker');
+    const gateCalls = () =>
+      calls().filter(c => c.prompt.includes('Determine location eligibility')).length;
+    const gatesBefore = gateCalls();
+    const confirmedRun = run(['--job=4', '--location-ok']);
+    assert.ok(confirmedRun.includes('#4 eligibility: PASS (location confirmed by the user)'));
+    assert.equal(gateCalls(), gatesBefore + 1, 'the gate still runs for a confirmed job');
+    assert.equal((await q('SELECT status FROM jobs WHERE id=4'))[0].status, 'Evaluated');
+    // A FAIL verdict discarded job 5 earlier; moved back to Pending it can be confirmed too.
+    await q("UPDATE jobs SET status='Pending' WHERE id=5");
+    const failRun = run(['--job=5', '--location-ok']);
+    assert.ok(failRun.includes('#5 eligibility: PASS (location confirmed by the user)'));
+    assert.equal((await q('SELECT status FROM jobs WHERE id=5'))[0].status, 'Evaluated');
     console.log(
-      'Evaluation CLI tests passed: rendering, validation, repo containment, dry-run, prepare, cache skip, research dedup, privacy, mixed outcomes, finalization and resumable failures.',
+      'Evaluation CLI tests passed: rendering, validation, repo containment, dry-run, prepare, cache skip, research dedup, privacy, mixed outcomes, finalization, resumable failures and --location-ok.',
     );
   }
 } finally {

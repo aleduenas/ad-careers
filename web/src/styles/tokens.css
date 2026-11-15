@@ -1,5 +1,6 @@
 /* Design tokens: the light palette on :root and the dark palette on :root[data-theme="dark"]. */
 
+/* Design tokens: the light palette on :root and the dark palette on :root[data-theme="dark"]. */
 :root {
   color-scheme: light;
   /* F17: the page background is a green-tinted grey so margins read as margins; surfaces stay white. */
@@ -61,28 +62,15 @@
   --focus: #9ce6c1;
 }
 
-.search-control,
-.jobs-controls > label {
-  display: grid;
-  gap: 5px;
-  color: var(--muted);
-  font-size: 12px;
-  font-weight: 650;
-}
-
-.task-extra-error {
-  color: var(--red);
-}
-
 @media (min-width: 701px) {
-  /* Package 4.3 F12: breathing room in the workspace; F13: Add a job on the Jobs page; F14: details. */
-  :root {
+/* Package 4.3 F12: breathing room in the workspace; F13: Add a job on the Jobs page; F14: details. */
+:root {
     --gutter: 32px;
   }
 }
 
 @media (min-width: 1024px) {
-  :root {
+:root {
     --gutter: 44px;
   }
 }

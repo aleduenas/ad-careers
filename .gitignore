@@ -65,3 +65,5 @@ bun.lock
 notes/
 # Local debug output; never committed.
 debug.log
+# Lead working notes stay on this machine; never committed.
+.claude/agent-memory/

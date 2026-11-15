@@ -19,9 +19,9 @@ const DEFAULT_HOST = '127.0.0.1:4310';
 const DEFAULT_ORIGIN = 'http://127.0.0.1:4310';
 const DEVELOPMENT_ORIGIN = 'http://127.0.0.1:5173';
 const API_PREFIX = '/api/v1';
-// The daily posting check changes job statuses by itself, so its timer is off by default
-// (summary and run routes stay registered). Off until the D117 review passes (lead flips it).
-export const LIVENESS_DAILY_ENABLED = false;
+// The daily posting check changes job statuses by itself, so one switch turns its timer off
+// (summary and run routes stay registered). On since 2026-11-15 at the owner's decision (D127).
+export const LIVENESS_DAILY_ENABLED = true;
 const BODY_LIMIT = 1024 * 1024;
 
 function apiError(statusCode, code, message, retryable = false) {

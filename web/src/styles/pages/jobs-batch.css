@@ -1,5 +1,6 @@
-/* Batch evaluate on the Jobs page: the bar above the results, the confirm dialog and the status line. */
+/* The jobs-batch page. */
 
+/* Batch evaluate on the Jobs page: the bar above the results, the confirm dialog and the status line. */
 .batch-bar {
   display: flex;
   flex-wrap: wrap;
@@ -115,20 +116,20 @@
 }
 
 @media (max-width: 700px) {
-  .batch-bar {
+.batch-bar {
     align-items: stretch;
   }
 
-  .batch-buttons button {
+.batch-buttons button {
     flex: 1 1 130px;
   }
 
-  .batch-status {
+.batch-status {
     flex-direction: column;
     align-items: stretch;
   }
 
-  .batch-status-actions button {
+.batch-status-actions button {
     flex: 1 1 120px;
   }
 }

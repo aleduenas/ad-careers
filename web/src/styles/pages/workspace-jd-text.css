@@ -1,5 +1,6 @@
-/* The Formatted / Raw text switch above the job description. */
+/* The workspace-jd-text page. */
 
+/* The Formatted / Raw text switch above the job description. */
 .jd-view-switch {
   display: inline-flex;
   gap: 4px;

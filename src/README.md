@@ -45,7 +45,11 @@ Codex login only; API keys are stripped from their environment by `lib/cli-runti
   report file is written and `jobs.report_path` points at it. Other statuses are rejected.
 - JDs come from the database or `data/jds/` only. A missing JD yields a minimal Discarded report
   with no model call. An ambiguous location returns REVIEW and leaves the job Pending; fix the
-  cached evidence and start a new run. Pasted JDs (`source: manual-paste` in the stored
+  cached evidence and start a new run, or confirm the location with `--job=ID --location-ok` (the
+  gate still runs, a REVIEW or FAIL verdict no longer stops that job; browser: `locationConfirmed`
+  on an evaluate run). A run that ends needing that decision is `failed` with error code
+  `LOCATION_REVIEW` and the gate reason as the run item's `detail`, read from the worker's task
+  record. Pasted JDs (`source: manual-paste` in the stored
   frontmatter) skip the location gate; every other phase still runs.
 - Company research is cached under `data/company-info/` with 90-day per-section freshness, checked
   in code; only missing or stale sections are researched, once per company per run. Research gets
@@ -134,8 +138,8 @@ never reach a response. Database trouble is a 503, never a fallback.
 Modules: `app.mjs` (routes, guards), `jobs-read/detail/write/search/materials/compensation/paths.mjs`
 (data layer), `runs.mjs` + `runs-store.mjs` (launcher dispatch and persistence; launchers are spawned
 with argument arrays, never shell strings), `intake*.mjs`, `ghosting.mjs` (scheduled: Applied jobs with no response after 40 days become Ghosted),
-`liveness.mjs` (posting-check runs started from the dashboard; the daily run is off behind
-`LIVENESS_DAILY_ENABLED` in `app.mjs` until reviewed), `providers.mjs`, `cost.mjs`,
+`liveness.mjs` (posting-check runs started from the dashboard, and a daily run when the last full
+check is over a day old; `LIVENESS_DAILY_ENABLED` in `app.mjs` switches the daily run off), `providers.mjs`, `cost.mjs`,
 `letter.mjs`, `readiness.mjs`, `static.mjs`, `start.mjs`. Reads are parameterised SELECTs through
 `lib/_database.mjs`; writes go through the SQL transition functions with the expected revision.
 

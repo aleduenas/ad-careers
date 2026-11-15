@@ -4,7 +4,6 @@ import { api } from '../../lib/client';
 import { formatDateTime } from '../../lib/format';
 import { trapTab } from '../../lib/hooks';
 import { postingCheckError } from '../../lib/posting';
-import './posting-check.css';
 
 const POLL_MS = 4000;
 
@@ -156,7 +155,8 @@ export function PostingCheckCard({ nonce }: { nonce: string }) {
     <section className="edit-card discover-card" aria-labelledby="posting-title">
       <h3 id="posting-title">Posting check</h3>
       <p className="pane-meta">
-        Looks at each posting to see whether it is still open. Runs when you start it.
+        Looks at each posting to see whether it is still open. Runs once a day, and when you start
+        it.
       </p>
       {summary.kind === 'loading' && (
         <p className="pane-meta" role="status">

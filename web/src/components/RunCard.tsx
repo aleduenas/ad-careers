@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { letterPdfHref, type RunRecord } from '../api';
 import { api } from '../lib/client';
+import { LocationReview } from './LocationReview';
 import { formatDateTime } from '../lib/format';
 import {
   errorText,
@@ -80,7 +81,10 @@ function useLastLogLines(runId: string, enabled: boolean, count = 3) {
 
 export function RunLastLines({ run }: { run: RunRecord }) {
   const failed = run.state === 'failed' || run.state === 'interrupted';
-  const lines = useLastLogLines(run.id, failed);
+  const location = needsLocationDecision(run);
+  // A location review shows the reason the gate saved (not log brackets) and what to do about it.
+  const lines = useLastLogLines(run.id, failed && !location);
+  if (location) return <LocationReview run={run} />;
   if (!failed || !lines || lines.length === 0) return null;
   return (
     <pre className="run-last-lines" aria-label="Last lines of the run log">

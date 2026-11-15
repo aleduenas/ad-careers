@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import {
   OUTAGE_LIMITS,
   SLOW_DOWN,
+  reasonOf,
+  closurePhrase,
   checkPosting,
   closureSigns,
   decideActions,
@@ -639,7 +641,7 @@ assert.equal(
 {
   const row = (id, n) => ({
     id: String(id),
-    url: `https://boards.greenhouse.io/acme/jobs/${n}`,
+    url: `https://boards.greenhouse.io/solo${id}/jobs/${n}`,
     status: 'Pending',
     revision: '1',
     restored: false,
@@ -674,6 +676,232 @@ assert.equal(
   assert.match(stored[1][2], /task started/i);
   assert.deepEqual([out.discarded, out.discardFailed, out.startedLate], [1, 1, 1]);
   assert.equal(reads, 3, 'the task flag is re-read before each discard');
+}
+
+// Closure phrases on a plain 200 page: probably_closed, never open; unrelated "closed" is open.
+{
+  const text = 'x'.repeat(400);
+  const plain = (body, extra = {}) =>
+    `<html><nav>Jobs closed on weekends</nav><body>${body}<script type="application/ld+json">${JSON.stringify({ '@type': 'JobPosting', title: 'Data Engineer', description: text, ...extra })}</script></body></html>`;
+  const check = async html => checkPosting(page, { fetchImpl: mock([[page, reply(200, html)]]) });
+  const phrase = await check(
+    plain('<p>Sorry, this position has been filled. Browse other roles.</p>'),
+  );
+  assert.equal(phrase.state, 'probably_closed');
+  assert.equal(reasonOf(phrase), 'phrase');
+  assert.equal(
+    (await check(plain('<p>This job is no longer available.</p>'))).state,
+    'probably_closed',
+  );
+  assert.equal(
+    (
+      await check(
+        plain('<p>Our office is closed on public holidays and the cafe is closed Sundays.</p>'),
+      )
+    ).state,
+    'open',
+  );
+  assert.equal(
+    (await check(plain('<p>Some benefits are no longer available to new hires.</p>'))).state,
+    'open',
+  );
+  assert.equal(
+    (
+      await check(
+        plain('<script>var t = "this position has been filled";</script><p>Apply now</p>'),
+      )
+    ).state,
+    'open',
+    'text inside scripts is not a sign',
+  );
+  assert.equal(
+    (await check(plain('<footer>This job posting has expired elsewhere</footer><p>Apply now</p>')))
+      .state,
+    'open',
+    'navigation and footer text is not a sign',
+  );
+  const expiry = await check(plain('<p>Apply now</p>', { validThrough: '2020-01-01' }));
+  assert.deepEqual([expiry.state, reasonOf(expiry)], ['probably_closed', 'expiry']);
+}
+
+// A closure phrase must say the posting is closed now, not state a condition.
+{
+  const said = text => closurePhrase(text);
+  assert.equal(
+    said(
+      'Applications will be accepted on a rolling basis thereafter until the position is filled.',
+    ),
+    null,
+  );
+  assert.equal(said('We will close this posting once the position is filled'), null);
+  assert.equal(said('Apply early, as the role may close if the position is filled.'), null);
+  assert.equal(said('This position has been filled.'), 'This position has been filled');
+  assert.equal(said('This position is filled.'), 'This position is filled');
+  assert.equal(said('Thanks for visiting. The position is closed.'), 'The position is closed');
+  assert.equal(said('Note that if this position has been filled we will say so.'), null);
+  assert.equal(said('Sorry, this job is no longer available.'), 'this job is no longer available');
+  assert.equal(
+    said('We are no longer accepting applications.'),
+    'no longer accepting applications',
+  );
+  assert.equal(said('Our office is closed on public holidays.'), null);
+  // The same rule applies to a rendered page.
+  const sign = closureSigns({
+    url: new URL(page),
+    finalUrl: page,
+    html: '<body>Applications are accepted until the position is filled.</body>',
+  });
+  assert.equal(sign, null);
+  const plainOpen = await checkPosting(page, {
+    fetchImpl: mock([
+      [
+        page,
+        reply(
+          200,
+          '<html><body><p>Applications will be accepted on a rolling basis thereafter until the position is filled.</p><script type="application/ld+json">' +
+            JSON.stringify({ '@type': 'JobPosting', description: 'x'.repeat(400) }) +
+            '</script></body></html>',
+        ),
+      ],
+    ]),
+  });
+  assert.equal(plainOpen.state, 'open');
+}
+
+// Closure notices are read only where sites put them: title, first headings, opening text.
+{
+  const filler =
+    'We build data platforms and look for people who enjoy careful engineering. '.repeat(8);
+  const ld = `<script type="application/ld+json">${JSON.stringify({ '@type': 'JobPosting', description: 'x'.repeat(400) })}</script>`;
+  const check = html => checkPosting(page, { fetchImpl: mock([[page, reply(200, html)]]) });
+  const sixSentences = [
+    'We are no longer accepting applications from recruitment agencies.',
+    'This role is no longer open to remote candidates outside Canada.',
+    'Applications are closed on November 30, so apply soon.',
+    'Applications for this role are closed to candidates without work authorization.',
+    'The position is filled by a team of five.',
+    'The role is not available to contractors.',
+  ];
+  for (const sentence of sixSentences) {
+    const inBody = await check(
+      `<html><body><h1>Data Engineer</h1><p>${filler}</p><p>${sentence}</p>${ld}</body></html>`,
+    );
+    assert.equal(inBody.state, 'open', `in the body: ${sentence}`);
+    const opening = await check(
+      `<html><body><h1>Data Engineer</h1><p>${sentence} ${filler}</p>${ld}</body></html>`,
+    );
+    assert.equal(opening.state, 'open', `qualified, even as the opening line: ${sentence}`);
+  }
+  const notice = 'This position has been filled.';
+  const asH1 = await check(`<html><body><h1>${notice}</h1><p>${filler}</p>${ld}</body></html>`);
+  assert.equal(asH1.state, 'probably_closed');
+  assert.equal(reasonOf(asH1), 'phrase');
+  assert.equal(
+    (await check(`<html><body><p>${notice} ${filler}</p>${ld}</body></html>`)).state,
+    'probably_closed',
+  );
+  assert.equal(
+    (
+      await check(
+        `<html><head><title>${notice}</title></head><body><p>${filler}</p>${ld}</body></html>`,
+      )
+    ).state,
+    'probably_closed',
+  );
+  assert.equal(
+    (
+      await check(
+        `<html><body><h1>Data Engineer</h1><p>${filler}</p><p>${notice}</p>${ld}</body></html>`,
+      )
+    ).state,
+    'open',
+    'the same sentence deep in the description is not a notice',
+  );
+  assert.equal(
+    (
+      await check(
+        `<html><body><h1>Data Engineer</h1><p>Applications will be accepted on a rolling basis thereafter until the position is filled. ${filler}</p>${ld}</body></html>`,
+      )
+    ).state,
+    'open',
+  );
+}
+
+// Reasons are countable from the result and the stored detail.
+{
+  assert.equal(reasonOf({ state: 'open', detail: '' }), null);
+  assert.equal(
+    reasonOf({ state: 'closed', detail: 'The job board answered 404.' }),
+    'http-404-410',
+  );
+  assert.equal(
+    reasonOf({ state: 'closed', detail: 'The job board answered 410.' }),
+    'http-404-410',
+  );
+  assert.equal(
+    reasonOf({ state: 'closed', detail: "No longer listed on the employer's job board." }),
+    'list',
+  );
+  assert.equal(
+    reasonOf({ state: 'closed', detail: 'The job board says it no longer takes applications.' }),
+    'workday-apply',
+  );
+  assert.equal(
+    reasonOf({ state: 'probably_closed', detail: 'The address no longer carries the job ID.' }),
+    'lost-id',
+  );
+  const lines = [];
+  const rows = [1, 2].map(n => ({
+    id: String(n),
+    url: `https://boards.greenhouse.io/r${n}/jobs/${n}00`,
+    status: 'Applied',
+    revision: '1',
+    restored: false,
+    activeTask: false,
+  }));
+  const out = await runLiveness({
+    loadJobs: async () => rows,
+    dryRun: true,
+    fetchImpl: mock([['https://boards-api.greenhouse.io', reply(404)]]),
+    log: line => lines.push(line),
+  });
+  assert.deepEqual(out.reasons, { 'http-404-410': 2 });
+  const printed = lines.join(' | ');
+  assert.ok(printed.includes('closed [http-404-410]'));
+  assert.ok(printed.includes('by reason: http-404-410 2'));
+}
+
+// Small-board rule: two or more checked jobs, all closed in the run, are held back.
+{
+  const board = (closedCount, total, name = 'x') =>
+    Array.from({ length: total }, (_, i) =>
+      job(i + 1, 'Pending', { board: name, state: i < closedCount ? 'closed' : 'open' }),
+    );
+  const two = decideActions(board(2, 2));
+  assert.deepEqual(
+    [two.summary.heldBack, two.summary.wouldDiscard, two.summary.wouldFlag],
+    [2, 0, 2],
+  );
+  assert.deepEqual(two.summary.heldBoards, ['x']);
+  assert.ok(two.actions.every(a => a.action === 'flag' && a.heldBack));
+  const oneOfOne = decideActions(board(1, 1));
+  assert.deepEqual([oneOfOne.summary.heldBack, oneOfOne.summary.wouldDiscard], [0, 1]);
+  const twoOfThree = decideActions(board(2, 3));
+  assert.deepEqual([twoOfThree.summary.heldBack, twoOfThree.summary.wouldDiscard], [0, 2]);
+  const twoOfTwoUnknownSkipped = decideActions([
+    job(1, 'Pending', { board: 'x', state: 'closed' }),
+    job(2, 'Pending', { board: 'x', state: 'closed', activeTask: true }),
+  ]);
+  assert.equal(
+    twoOfTwoUnknownSkipped.summary.wouldDiscard,
+    1,
+    'a skipped job is not a checked job',
+  );
+  const mixed = decideActions([
+    ...board(2, 2, 'x'),
+    job(9, 'Pending', { board: 'y', state: 'closed' }),
+  ]);
+  assert.equal(mixed.actions.at(-1).action, 'discard', 'other boards are unaffected');
 }
 
 console.log('liveness tests OK');

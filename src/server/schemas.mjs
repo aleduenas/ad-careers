@@ -610,6 +610,8 @@ const runItem = {
     finishedAt: dateTimeOrNull,
     selection: runSelection,
     source: { type: 'string', enum: ['browser', 'legacy'] },
+    // Present only on a run that ended LOCATION_REVIEW: the gate's reason, at most 300 characters.
+    detail: { type: 'string', maxLength: 300 },
   },
 };
 
@@ -627,6 +629,8 @@ const runCreateRequest = {
         jobId: { type: 'string', pattern: '^[1-9][0-9]{0,18}$' },
         requestKey: runRequestKey,
         selection: runSelectionOverride,
+        // The user confirmed the location of a job the gate held for review. Evaluate only, one job.
+        locationConfirmed: { type: 'boolean' },
       },
     },
     {

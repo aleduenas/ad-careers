@@ -44,7 +44,12 @@ code maintenance, running documented commands, and keeping documentation in step
    before any Submit/Send/Apply action. Every generated CV, letter or answer is a draft the user
    reviews.
 7. **No unrequested side effects.** Evaluating a job never generates a CV or PDF; scoring is never
-   a gate on any explicit user action.
+   a gate on any explicit user action. Two documented, server-owned rules change a status by
+   themselves, and no other code may: Ghosted (`src/server/ghosting.mjs`: Applied with no response
+   for 40 days) and the posting check (`src/scan/liveness.mjs`: a posting that closed before the
+   user applied becomes Discarded with reason "Posting expired"; it runs daily, and
+   `LIVENESS_DAILY_ENABLED` in `src/server/app.mjs` switches that off). Both go through the SQL
+   transition functions.
 8. **Tests and builds.** `node src/test-all.mjs --quick` before reporting done (`npm test` runs the
    full suite including the web production build). Isolated database integration: `node
    src/helpers/db-test.mjs` (never against the personal database).

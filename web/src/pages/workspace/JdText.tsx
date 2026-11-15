@@ -1,6 +1,20 @@
 import { useState } from 'react';
 import { ReportMarkdown } from '../../components/ReportMarkdown';
-import './jd-text.css';
+
+// Cached job descriptions start with a front-matter block between two --- lines. Markdown would turn
+// its last line into a big heading, so for the formatted view it is shown as a plain block.
+const FRONT_MATTER = /^---\r?\n([\s\S]*?)\r?\n---[ \t]*(\r?\n|$)/;
+const KEY_VALUE_LINE = /^[A-Za-z0-9_-]+[ \t]*:/;
+
+// Only a block whose every line is blank or looks like `key: value` is front matter; a --- rule
+// after real prose is just a rule.
+function withFrontMatterShown(text: string): string {
+  return text.replace(FRONT_MATTER, (all, block: string) =>
+    block.split(/\r?\n/).every((line: string) => line.trim() === '' || KEY_VALUE_LINE.test(line))
+      ? '```\n' + block + '\n```\n'
+      : all,
+  );
+}
 
 /**
  * The stored job description. By default it is shown formatted (Markdown through the same safe
@@ -40,7 +54,7 @@ export function JdText({ text }: { text: string }) {
           {text}
         </pre>
       ) : (
-        <ReportMarkdown text={text} label="Job description text" keepLines />
+        <ReportMarkdown text={withFrontMatterShown(text)} label="Job description text" keepLines />
       )}
     </>
   );

@@ -1,5 +1,10 @@
 /* The tasks page. */
 
+.task-extra-error {
+  color: var(--red);
+}
+
+/* The tasks page. */
 /* Package 3.6: Tasks page and navigation count. */
 .tasks-page {
   display: grid;
@@ -102,15 +107,11 @@
 }
 
 @media (max-width: 1100px) {
-  .task-extra-error {
-    color: var(--red);
-  }
-
-  .tasks-table {
+.tasks-table {
     min-width: 0;
   }
 
-  .tasks-table tbody th {
+.tasks-table tbody th {
     white-space: normal;
   }
 }

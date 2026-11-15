@@ -6,6 +6,7 @@ import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 import { query as databaseQuery } from '../lib/_database.mjs';
 import { resolveCommand } from '../lib/cli-runtime.mjs';
+import { cleanDetail, MAX_OUTCOME_DETAIL } from '../lib/_task-status.mjs';
 import { slug as companySlug } from '../eval/_evaluation-cli.mjs';
 import { root as repositoryRoot } from '../lib/root.mjs';
 import { DatabaseUnavailableError, SchemaNotReadyError } from './readiness.mjs';
@@ -521,7 +522,13 @@ export function createRunsService({
       };
     }
     for (const key of Object.keys(input))
-      if (!['action', 'jobId', 'requestKey', 'selection'].includes(key)) throw invalid(key);
+      if (!['action', 'jobId', 'requestKey', 'selection', 'locationConfirmed'].includes(key))
+        throw invalid(key);
+    if (input.locationConfirmed !== undefined) {
+      // The user's own confirmation of a location review; one job, evaluate only.
+      if (input.action !== 'evaluate' || typeof input.locationConfirmed !== 'boolean')
+        throw invalid('locationConfirmed');
+    }
     if (typeof input.action !== 'string' || !REQUEST_ACTIONS.has(input.action))
       throw invalid('action', 'This action is not available from the browser yet.');
     if (typeof input.jobId !== 'string' || !ID_PATTERN.test(input.jobId)) throw invalid('jobId');
@@ -532,6 +539,7 @@ export function createRunsService({
       jobId: input.jobId,
       requestKey: input.requestKey,
       override: validateOverride(input.action, input.selection),
+      locationConfirmed: input.locationConfirmed === true,
     };
   }
 
@@ -667,7 +675,14 @@ export function createRunsService({
                   ...(run.selection?.company ? [`--company=${run.selection.company}`] : []),
                   `--report-json=${join('logs', 'dashboard', scanReportName(run.logRef))}`,
                 ]
-              : [script, `--job=${run.jobId}`, ...selectionFlags(run.action, run.selection)];
+              : [
+                  script,
+                  `--job=${run.jobId}`,
+                  ...selectionFlags(run.action, run.selection),
+                  ...(run.action === 'evaluate' && run.selection?.locationConfirmed === true
+                    ? ['--location-ok']
+                    : []),
+                ];
       child = spawn(process.execPath, args, {
         cwd: rootDir,
         detached: true,
@@ -924,7 +939,7 @@ export function createRunsService({
     if (validated.action === 'scan') return dispatchScan(validated);
     if (validated.action === 'liveness') return dispatchLiveness(validated);
     if (validated.action === 'publish') return dispatchPublish(validated);
-    const { action, jobId, requestKey, override } = validated;
+    const { action, jobId, requestKey, override, locationConfirmed } = validated;
     return serialized(() =>
       guarded(async () => {
         const job = await lookupJob(jobId);
@@ -956,6 +971,8 @@ export function createRunsService({
           // to the settings file.
           const selection = { ...(resolveSelection ? await resolveSelection(task) : {}) };
           for (const key of OVERRIDE_KEYS[task]) if (override[key]) selection[key] = override[key];
+          // Stored with the run so the launch adds --location-ok; never shown on the wire.
+          if (locationConfirmed && task === 'evaluate') selection.locationConfirmed = true;
           selections.set(task, selection);
         }
         await ensureProviders(selections.values());
@@ -1223,6 +1240,25 @@ export function createRunsService({
     });
   }
 
+  // A run that ended LOCATION_REVIEW carries the gate's reason, which the worker saved in its task
+  // record (`detail`, at most 300 characters). Read once per request, bounded, redacted, never
+  // thrown: a missing or odd record just means no detail.
+  async function wireWithDetail(run) {
+    const wire = toWireRun(run);
+    if (run.errorCode !== 'LOCATION_REVIEW' || !LOG_REF_PATTERN.test(run.logRef)) return wire;
+    try {
+      const path = join(recordDir, `${run.logRef.replace(/\.log$/, '')}.json`);
+      const info = await lstat(path);
+      if (!info.isFile() || info.size > 64 * 1024) return wire;
+      const detail = JSON.parse(await readFile(path, 'utf8')).detail;
+      const text =
+        typeof detail === 'string' ? redactLog(cleanDetail(detail) ?? '', { rootDir }) : '';
+      return text ? { ...wire, detail: text.slice(0, MAX_OUTCOME_DETAIL) } : wire;
+    } catch {
+      return wire;
+    }
+  }
+
   // `limit` is the number of terminal rows (default 12, 1 to 50); active rows are always listed.
   async function list({ jobId, limit } = {}) {
     if (jobId !== undefined && (typeof jobId !== 'string' || !ID_PATTERN.test(jobId)))
@@ -1235,9 +1271,11 @@ export function createRunsService({
       bound = number;
     }
     return guarded(async () => {
-      const browser = (
-        await runs.list({ jobId, ...(bound === undefined ? {} : { limit: bound }) })
-      ).map(toWireRun);
+      const browser = await Promise.all(
+        (await runs.list({ jobId, ...(bound === undefined ? {} : { limit: bound }) })).map(
+          wireWithDetail,
+        ),
+      );
       if (!legacy) return { runs: browser };
       // Legacy rows follow the browser rows; the terminal limit covers both sources together.
       const terminal = browser.filter(run => !['queued', 'running'].includes(run.state)).length;
@@ -1277,7 +1315,7 @@ export function createRunsService({
         const row = await legacyRow(id);
         if (row) return { run: row.run };
       }
-      return { run: toWireRun(await loadRun(id)) };
+      return { run: await wireWithDetail(await loadRun(id)) };
     });
   }
 

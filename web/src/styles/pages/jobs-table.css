@@ -1,0 +1,78 @@
+/* The jobs-table page. */
+
+@media (max-width: 1500px) {
+/*
+ * With the checkbox and star in the first two columns the full table needs about 1160 px, more than
+ * the content area has up to about 1500 px of window width. Fold the minor columns into the
+ * company cell (as the stylesheet already does on narrow windows) and tighten the fixed columns.
+ * The company column keeps at least 200 px: when the card is narrower than the table it scrolls
+ * sideways instead of squeezing the text.
+ */
+.table-scroll .jobs-table {
+    min-width: 912px;
+  }
+
+.table-scroll .jobs-table th:nth-child(2) {
+    width: auto;
+  }
+
+.table-scroll .jobs-table th:nth-child(3) {
+    width: 104px;
+  }
+
+.table-scroll .jobs-table th:nth-child(4) {
+    width: 56px;
+  }
+
+.table-scroll .jobs-table th:nth-child(5) {
+    width: 150px;
+  }
+
+.table-scroll .jobs-table th:nth-child(6) {
+    width: 130px;
+  }
+
+.table-scroll .jobs-table th:nth-child(9) {
+    width: 200px;
+  }
+
+.table-scroll .jobs-table .col-minor {
+    display: none;
+  }
+
+.table-scroll .jobs-table .task-extra,
+  .table-scroll .jobs-table .job-name .task-extra {
+    display: block;
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+}
+
+/* Years-of-experience estimate, the posting-check mark and the extra filter row on the Jobs page. */
+.jobs-table .job-name .job-yoe {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.jobs-table .job-name .job-yoe .job-yoe-mark {
+  font-style: normal;
+  opacity: 0.85;
+}
+
+.jobs-table .posting-mark {
+  display: block;
+  width: fit-content;
+  margin-top: 5px;
+  padding: 1px 7px;
+  border: 1px solid var(--orange);
+  border-radius: 6px;
+  background: var(--orange-bg);
+  color: var(--orange);
+  font-size: 11px;
+  font-weight: 650;
+  white-space: nowrap;
+}

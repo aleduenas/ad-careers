@@ -415,6 +415,44 @@ test('discard reason text: none, reason, comment, both, and the server length ca
   assert.equal(visibleDiscardReason('Expired'), 'Expired');
 });
 
+test('location review: the evaluate request carries locationConfirmed and runs may carry a short detail', async () => {
+  const meta = { requestId: 'synthetic', observedAt: '2026-01-01T00:00:00Z' };
+  const run = {
+    id: '00000000-0000-4000-8000-000000000003', requestKey: 'k', groupId: null, action: 'evaluate', jobId: '12',
+    state: 'failed', phase: 'done', attempt: 1, exitCode: 2, errorCode: 'LOCATION_REVIEW',
+    createdAt: '2026-11-15T06:00:00Z', startedAt: null, updatedAt: '2026-11-15T06:00:00Z', finishedAt: null,
+    selection: null, source: 'browser', detail: 'The posting lists three offices and none is in Canada.',
+  };
+  const calls = [];
+  const client = createApi(async (url, options) => {
+    calls.push({ url: String(url), options });
+    return response(options.method === 'POST' ? 201 : 200, { data: { runs: [run] }, meta });
+  });
+  await client.startJobRun(
+    { action: 'evaluate', jobId: '12', requestKey: 'job-evaluate-12-x', locationConfirmed: true },
+    'nonce-value',
+    new AbortController().signal,
+  );
+  assert.deepEqual(JSON.parse(calls[0].options.body), {
+    action: 'evaluate',
+    jobId: '12',
+    requestKey: 'job-evaluate-12-x',
+    locationConfirmed: true,
+  });
+  const listed = await client.runs(new AbortController().signal, '12');
+  assert.equal(listed.data.runs[0].detail, run.detail);
+  for (const detail of ['x'.repeat(301), 5]) {
+    await assert.rejects(
+      createApi(async () => response(200, { data: { runs: [{ ...run, detail }] }, meta })).runs(new AbortController().signal),
+      error => error.code === 'INVALID_RESPONSE',
+    );
+  }
+  const plain = { ...run };
+  delete plain.detail;
+  const old = await createApi(async () => response(200, { data: { runs: [plain] }, meta })).runs(new AbortController().signal);
+  assert.equal(old.data.runs[0].detail, undefined, 'older runs have no detail');
+});
+
 test('safe cursor validation details survive without exposing untrusted errors', async () => {
   const client = createApi(async () =>
     response(400, {

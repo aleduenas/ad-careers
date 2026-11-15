@@ -1,5 +1,6 @@
 /* The ActionDialog component. */
 
+/* The ActionDialog component. */
 .action-functions {
   display: grid;
   gap: 14px;
@@ -45,7 +46,7 @@
 }
 
 @media (max-width: 700px) {
-  .action-override {
+.action-override {
     grid-template-columns: minmax(0, 1fr);
   }
 }

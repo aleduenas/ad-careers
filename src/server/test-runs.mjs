@@ -2511,3 +2511,77 @@ test('a scan is refused while a whole-board posting check is active, but not for
     store.rows.get(whole.id).state = 'completed';
   });
 });
+
+test('D125 locationConfirmed adds --location-ok for one evaluate only and is never on the wire', async () => {
+  await withRoot(async rootDir => {
+    const { service, children } = batchService(rootDir);
+    const plain = await service.dispatch({ action: 'evaluate', jobId: '1', requestKey: 'lc-0' });
+    assert.ok(!children[0].args.includes('--location-ok'));
+    assert.equal(plain.runs[0].selection.locationConfirmed, undefined);
+    const confirmed = await service.dispatch({
+      action: 'evaluate',
+      jobId: '2',
+      requestKey: 'lc-1',
+      locationConfirmed: true,
+    });
+    const child = children.find(c => c.args.includes('--job=2'));
+    assert.ok(child.args.includes('--location-ok'));
+    assert.deepEqual(
+      child.args.filter(arg => arg.startsWith('--')),
+      ['--job=2', '--location-ok'],
+    );
+    assert.equal('locationConfirmed' in confirmed.runs[0].selection, false);
+    for (const body of [
+      { action: 'cv', jobId: '3', requestKey: 'lc-2', locationConfirmed: true },
+      { action: 'both', jobId: '3', requestKey: 'lc-3', locationConfirmed: true },
+      { action: 'evaluate', jobId: '3', requestKey: 'lc-4', locationConfirmed: 'yes' },
+    ])
+      await rejects(service.dispatch(body), 400, 'INVALID_REQUEST', 'locationConfirmed');
+    await exitChild(children[0]);
+    await exitChild(child);
+  });
+});
+
+test('D125 a LOCATION_REVIEW run exposes the worker-saved gate reason as detail, bounded and redacted', async () => {
+  await withRoot(async rootDir => {
+    const { service, store, children } = batchService(rootDir);
+    const { runs } = await service.dispatch({ action: 'evaluate', jobId: '1', requestKey: 'd-1' });
+    const row = await store.get(runs[0].id);
+    const recordPath = join(
+      rootDir,
+      'logs',
+      'dashboard',
+      'tasks',
+      `${row.logRef.replace(/\.log$/, '')}.json`,
+    );
+    const record = JSON.parse(await readFile(recordPath, 'utf8'));
+    const reason = `Remote but US only ${rootDir} OPENAI_API_KEY=sk-live-0123456789abcdef0123456789abcdef`;
+    await writeFile(recordPath, JSON.stringify({ ...record, detail: reason + 'x'.repeat(400) }));
+    await store.finish(runs[0].id, 'failed', 2, 'LOCATION_REVIEW');
+    const got = (await service.get(runs[0].id)).run;
+    assert.equal(got.errorCode, 'LOCATION_REVIEW');
+    assert.match(got.detail, /^Remote but US only /);
+    assert.ok(got.detail.length <= 300);
+    assert.ok(!got.detail.includes(rootDir) && !got.detail.includes('sk-live'));
+    const listed = (await service.list()).runs.find(run => run.id === runs[0].id);
+    assert.equal(listed.detail, got.detail);
+    // No detail for other errors or a missing record.
+    const other = await service.dispatch({ action: 'evaluate', jobId: '2', requestKey: 'd-2' });
+    await store.finish(other.runs[0].id, 'failed', 1, 'EXIT_NONZERO');
+    assert.equal('detail' in (await service.get(other.runs[0].id)).run, false);
+    const third = await service.dispatch({ action: 'evaluate', jobId: '3', requestKey: 'd-3' });
+    await store.finish(third.runs[0].id, 'failed', 2, 'LOCATION_REVIEW');
+    await rm(
+      join(
+        rootDir,
+        'logs',
+        'dashboard',
+        'tasks',
+        `${(await store.get(third.runs[0].id)).logRef.replace(/\.log$/, '')}.json`,
+      ),
+      { force: true },
+    );
+    assert.equal('detail' in (await service.get(third.runs[0].id)).run, false);
+    for (const child of children) await exitChild(child);
+  });
+});

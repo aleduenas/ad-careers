@@ -61,6 +61,7 @@ const allowed = [
   'research-model',
   'dry-run',
   'prepare-only',
+  'location-ok',
   'resume',
   'doctor',
   'smoke',
@@ -208,7 +209,7 @@ let state, runDir;
 if (options.resume) {
   if (typeof options.resume !== 'string' || !/^\d{4}-[\w-]+$/.test(options.resume))
     throw new Error('Use a run ID printed by the launcher');
-  if (['job', 'select', 'next', 'prepare-only', 'dry-run'].some(k => options[k]))
+  if (['job', 'select', 'next', 'prepare-only', 'dry-run', 'location-ok'].some(k => options[k]))
     throw new Error('Resume cannot be combined with selection or preparation');
   runDir = join(archive, options.resume);
   state = JSON.parse(read(join(runDir, 'run.json')));
@@ -220,6 +221,8 @@ if (options.resume) {
 } else {
   if (['job', 'select', 'next'].filter(k => options[k] !== undefined).length !== 1)
     throw new Error('Choose exactly one of --job, --select, --next');
+  if (options['location-ok'] !== undefined && (options['location-ok'] !== true || !options.job))
+    throw new Error('--location-ok is only valid with --job=ID');
   if (options.job && !/^\d+$/.test(options.job))
     throw new Error('Job must be a permanent numeric ID');
   if (options.next && !/^[1-9]\d*$/.test(options.next))
@@ -369,7 +372,7 @@ try {
       if (state.staged[j.num]) return;
       try {
         const manual = j.manual_jd === true || isManualJD(j.jd);
-        const gate = manual
+        let gate = manual
           ? {
               decision: 'PASS',
               reason: 'Manual JD intake; location gate skipped by policy',
@@ -388,13 +391,24 @@ try {
                 passthrough,
               )
             : { decision: 'MISSING', reason: 'No cached JD', location: 'UNKNOWN' };
+        // The user confirmed the location: the gate still ran (its location text feeds market
+        // research), but a location verdict no longer stops this job. A missing JD stays missing.
+        const confirmed =
+          options['location-ok'] === true && ['REVIEW', 'FAIL'].includes(gate.decision);
+        if (confirmed)
+          gate = {
+            ...gate,
+            decision: 'PASS',
+            reason: 'Location confirmed by the user. ' + gate.reason,
+          };
         gates.set(j.num, gate);
         console.log(
           '#' +
             j.num +
             ' eligibility: ' +
             gate.decision +
-            (manual ? ' (manual intake; location gate skipped)' : ''),
+            (manual ? ' (manual intake; location gate skipped)' : '') +
+            (confirmed ? ' (location confirmed by the user)' : ''),
         );
       } catch (e) {
         failures.set(j.num, e.message);
@@ -589,7 +603,14 @@ try {
     );
     if (state.status !== 'complete') {
       // Only location reviews left (no failure): the dashboard shows this run as needing a decision.
-      if (!state.results.some(r => r.status === 'FAILED')) setRunOutcome('LOCATION_REVIEW');
+      if (!state.results.some(r => r.status === 'FAILED'))
+        setRunOutcome(
+          'LOCATION_REVIEW',
+          state.results
+            .filter(r => r.status === 'REVIEW')
+            .map(r => r.note)
+            .join(' '),
+        );
       process.exitCode = 2;
     }
   }

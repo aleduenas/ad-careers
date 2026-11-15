@@ -1,5 +1,6 @@
 /* The overview page. */
 
+/* The overview page. */
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -102,11 +103,11 @@
 }
 
 @media (max-width: 900px) {
-  .metric-grid {
+.metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .overview-grid {
+.overview-grid {
     grid-template-columns: minmax(0, 1fr);
   }
 }

@@ -20,8 +20,8 @@ async function ownerDm(discord, config) {
   return dm.id;
 }
 
-// Approved only when the message is in the owner-only DM, was written by this bot, and the
-// configured owner is among the users who added the check. Anything else is not an approval.
+// Approved only when the message is in the owner-only DM, was written by this bot, carries the
+// lead's own check (it was offered as a decision) and the configured owner added his check too.
 export async function checkApproval(discord, config, messageId, { mark = false } = {}) {
   if (!ID.test(messageId || '')) throw new Error('Give a numeric Discord message ID.');
   const dm = await ownerDm(discord, config);
@@ -32,13 +32,14 @@ export async function checkApproval(discord, config, messageId, { mark = false }
   const path = `/channels/${dm}/messages/${messageId}/reactions/${CHECK}`;
   if (mark) await discord.api('PUT', `${path}/@me`);
   const users = await discord.api('GET', `${path}?limit=100`);
+  const marked = users.some(user => user.id === me.id);
   return {
     message_id: messageId,
     first_line: String(message.content || '')
       .split('\n')[0]
       .slice(0, 160),
-    marked: users.some(user => user.id === me.id),
-    approved: users.some(user => user.id === config.owner_id),
+    marked,
+    approved: marked && users.some(user => user.id === config.owner_id),
   };
 }
 

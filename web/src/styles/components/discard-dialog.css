@@ -1,5 +1,6 @@
-/* The discard popout: every reason as a tick box, then an optional comment. */
+/* The discard-dialog component. */
 
+/* The discard popout: every reason as a tick box, then an optional comment. */
 .dialog.discard-dialog {
   width: min(780px, calc(100vw - 32px));
 }

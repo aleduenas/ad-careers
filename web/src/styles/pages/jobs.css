@@ -1,5 +1,6 @@
 /* The jobs page. */
 
+/* The jobs page. */
 .dialog-actions {
   display: flex;
   justify-content: flex-end;
@@ -11,12 +12,12 @@
 }
 
 @media (max-width: 700px) {
-  .dialog-actions {
+.dialog-actions {
     margin: 18px -18px -21px;
     padding: 13px 18px;
   }
 
-  .dialog-actions button {
+.dialog-actions button {
     flex: 1;
     padding-right: 8px;
     padding-left: 8px;
@@ -97,10 +98,6 @@
   white-space: nowrap;
 }
 
-.jobs-table tbody tr:last-child > * {
-  border-bottom: 0;
-}
-
 .job-id {
   font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
   font-variant-numeric: tabular-nums;
@@ -110,14 +107,6 @@
 .compensation-cell,
 .date-cell {
   overflow-wrap: anywhere;
-}
-
-.job-name strong,
-.job-name span,
-.compensation-cell span,
-.compensation-cell small,
-.date-cell span {
-  display: block;
 }
 
 .job-name span,
@@ -143,12 +132,6 @@
   color: var(--green);
 }
 
-.job-group h3 {
-  margin: 0 0 8px;
-  color: var(--green);
-  font-size: 14px;
-}
-
 .pagination {
   display: flex;
   align-items: center;
@@ -169,32 +152,32 @@
 }
 
 @media (max-width: 700px) {
-  .jobs-toolbar {
+.jobs-toolbar {
     display: grid;
     align-items: stretch;
   }
 
-  .jobs-toolbar .search-control {
+.jobs-toolbar .search-control {
     width: 100%;
   }
 
-  .jobs-controls {
+.jobs-controls {
     align-items: stretch;
   }
 
-  .jobs-controls > label:not(.checkbox-control) {
+.jobs-controls > label:not(.checkbox-control) {
     flex: 1 1 135px;
   }
 
-  .jobs-controls .checkbox-control {
+.jobs-controls .checkbox-control {
     flex: 1 1 100%;
   }
 
-  .pagination {
+.pagination {
     flex-wrap: wrap;
   }
 
-  .pagination span {
+.pagination span {
     order: -1;
     width: 100%;
   }
@@ -240,7 +223,7 @@
 }
 
 @media (max-width: 700px) {
-  .scroll-hint {
+.scroll-hint {
     display: block;
   }
 }
@@ -285,7 +268,7 @@
 }
 
 @media (max-width: 1100px) {
-  .task-extra,
+.task-extra,
   .job-name .task-extra {
     display: block;
     margin-top: 4px;
@@ -293,11 +276,11 @@
     font-size: 12px;
   }
 
-  .jobs-table {
+.jobs-table {
     min-width: 780px;
   }
 
-  .jobs-table th:nth-child(2) {
+.jobs-table th:nth-child(2) {
     width: auto;
   }
 }
@@ -450,7 +433,12 @@
 }
 
 @media (max-width: 1100px) {
-  .jobs-table {
+.jobs-table {
     min-width: 960px;
+  }
+
+/* Kept in this file, not in pages/tasks.css, to hold its place relative to ".task-extra, .job-name .task-extra". */
+.task-extra-error {
+    color: var(--red);
   }
 }
