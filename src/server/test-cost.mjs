@@ -5,6 +5,9 @@ import { createCostReader, createCostService, normalizeCostQuery, summarize } fr
 import { publicSchemas } from './schemas.mjs';
 import { DatabaseUnavailableError, SchemaNotReadyError } from './readiness.mjs';
 
+// Test guard: a test never reaches the configured database (see src/lib/_database.mjs).
+process.env.CAREER_OPS_TEST_GUARD = '1';
+
 const SOURCE = 'https://example.invalid/pricing, fetched 2026-01-01';
 const price = (provider, model, input, cached, write, output) => ({
   provider,

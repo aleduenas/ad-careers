@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import { legacyUrlKey, urlKey } from './_database.mjs';
 
+// Test guard: a test never reaches the configured database (see src/lib/_database.mjs).
+process.env.CAREER_OPS_TEST_GUARD = '1';
+
 assert.equal(urlKey(null), null);
 assert.equal(urlKey('https://www.Example.com/Jobs/42/'), 'example.com/jobs/42');
 assert.equal(urlKey('https://a.com/p#apply'), 'a.com/p');

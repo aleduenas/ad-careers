@@ -1,0 +1,53 @@
+/* Jobs search box: tips button, tips text and the server's message for a bad expression. */
+
+.jobs-toolbar .search-box {
+  position: relative;
+  display: block;
+  width: min(100%, 320px);
+  flex: 1 1 220px;
+}
+
+.jobs-toolbar .search-box .search-control {
+  width: 100%;
+}
+
+.jobs-toolbar .search-box .search-control input {
+  padding-right: 38px;
+}
+
+.search-hint-button {
+  position: absolute;
+  top: 4px;
+  right: 3px;
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.search-hint-button[aria-expanded='true'] {
+  color: var(--ink);
+}
+
+.search-hint,
+.search-problem {
+  margin: 6px 0 0;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.search-hint {
+  color: var(--muted);
+}
+
+.search-hint code {
+  font-size: 12px;
+  color: var(--ink);
+}
+
+.search-problem {
+  color: var(--red);
+}

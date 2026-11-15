@@ -1,0 +1,34 @@
+/*
+ * With the checkbox and star in the first two columns the full table needs about 1160 px, more than
+ * the content area has up to about 1500 px of window width. Fold the minor columns into the
+ * company cell (as the stylesheet already does on narrow windows) so the Move column is never
+ * clipped.
+ */
+@media (max-width: 1500px) {
+  .table-scroll .jobs-table {
+    min-width: 760px;
+  }
+
+  .table-scroll .jobs-table th:nth-child(2) {
+    width: auto;
+  }
+
+  .table-scroll .jobs-table .col-minor {
+    display: none;
+  }
+
+  .table-scroll .jobs-table .task-extra,
+  .table-scroll .jobs-table .job-name .task-extra {
+    display: block;
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 12px;
+  }
+}
+
+/* The inline discard form needs room for its reason list. */
+@media (max-width: 1500px) {
+  .table-scroll .jobs-table th:nth-child(9) {
+    width: 220px;
+  }
+}

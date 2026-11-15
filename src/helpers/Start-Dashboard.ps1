@@ -327,10 +327,10 @@ try {
 $probeResult = ($probe | & $node.Source --input-type=module - $Root 2>$null | Select-Object -Last 1)
 switch -Regex ("$probeResult") {
   '^OK$' { }
-  '^CONFIG$' { Fail 13 'the database is not configured. Create .env with POSTGRES_PASSWORD (node src/helpers/db-infra.mjs init) or set DATABASE_URL; see documentation/guides/database.md.' }
+  '^CONFIG$' { Fail 13 'the database is not configured. Create .env with POSTGRES_PASSWORD (node src/helpers/db-infra.mjs init) or set DATABASE_URL; see infra/README.md.' }
   '^FAIL (ECONNREFUSED|ETIMEDOUT|ENOTFOUND|57P03|08006)' { Fail 13 'the database is not reachable. Start it with npm run db:up and try again.' }
   '^FAIL 28' { Fail 13 'the database rejected the credentials in .env. Check POSTGRES_PASSWORD against the running container.' }
-  default { Fail 13 "the database check failed ($probeResult). Run npm run db:up, then see documentation/guides/database.md." }
+  default { Fail 13 "the database check failed ($probeResult). Run npm run db:up, then see infra/README.md." }
 }
 
 # 4. Already running from this script, then port free

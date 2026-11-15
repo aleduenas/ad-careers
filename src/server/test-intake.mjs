@@ -8,6 +8,9 @@ import { createIntakeService, runLauncher } from './intake.mjs';
 import { DatabaseUnavailableError, SchemaNotReadyError } from './readiness.mjs';
 import { createDiscoveryLock } from './runs.mjs';
 
+// Test guard: a test never reaches the configured database (see src/lib/_database.mjs).
+process.env.CAREER_OPS_TEST_GUARD = '1';
+
 const ROOT = resolve(tmpdir(), 'career-ops-intake-root');
 const TEXT = 'A real description line.   \r\n\tIndented, with trailing spaces   \n'.repeat(5);
 

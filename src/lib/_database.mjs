@@ -20,9 +20,7 @@ export function databaseConfig() {
   const env = { ...values, ...process.env };
   if (env.DATABASE_URL) return { connectionString: env.DATABASE_URL };
   if (!env.POSTGRES_PASSWORD)
-    throw new Error(
-      'Database not configured. Set POSTGRES_PASSWORD in .env; see documentation/guides/database.md.',
-    );
+    throw new Error('Database not configured. Set POSTGRES_PASSWORD in .env; see infra/README.md.');
   return {
     host: '127.0.0.1',
     port: Number(env.POSTGRES_PORT || 54329),
@@ -47,8 +45,28 @@ function onConnectionError(error) {
       : 'unknown';
   console.error('Database connection lost (' + code + '); the next query reconnects.');
 }
+// Test guard: with CAREER_OPS_TEST_GUARD=1 a connection to any database whose name does not start
+// with career_ops_test_ is refused before it is attempted, so a test that falls back to the
+// configured (personal) database fails loudly instead of touching it.
+export function assertTestDatabase(config = databaseConfig(), env = process.env) {
+  if (env.CAREER_OPS_TEST_GUARD !== '1') return;
+  let name = '';
+  try {
+    name = config.connectionString
+      ? decodeURIComponent(new URL(config.connectionString).pathname.replace(/^\//, ''))
+      : String(config.database ?? '');
+  } catch {
+    name = '';
+  }
+  if (!/^career_ops_test_[a-z0-9_]+$/.test(name))
+    throw new Error(
+      'Test guard: refusing to connect to a database that is not career_ops_test_*. ' +
+        'Tests must use node src/helpers/db-test.mjs or inject their own readers.',
+    );
+}
 export function db() {
   if (pool) return pool;
+  assertTestDatabase();
   const created = new pg.Pool({
     ...databaseConfig(),
     connectionTimeoutMillis: 5000,
@@ -91,7 +109,7 @@ const TRACKING_PARAM = /^(jr_id|source|src|gh_src|ref|lever-source|utm_.*)$/;
 // the stored column must try both.
 export function legacyUrlKey(url) {
   return (
-    url
+    (typeof url === 'string' ? url : undefined)
       ?.replace(/^https?:\/\/(www\.)?/, '')
       .replace(/[)\].,;]+$/, '')
       .replace(/\/+$/, '')
@@ -99,7 +117,7 @@ export function legacyUrlKey(url) {
   );
 }
 export function urlKey(url) {
-  if (!url) return null;
+  if (typeof url !== 'string' || !url) return null;
   let rest = url.replace(/^https?:\/\/(www\.)?/, '');
   // Hash-routed careers sites (`#/job/1`, `#!/job/1`) keep the fragment; every other one is dropped.
   const hash = rest.indexOf('#');

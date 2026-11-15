@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// prune-logs.mjs — apply the log/backup retention policy (documentation/guides/layout.md, Session 04).
+// prune-logs.mjs — apply the log/backup retention policy.
 //
 // Usage:
 //   node src/helpers/prune-logs.mjs            # dry run: list what would change

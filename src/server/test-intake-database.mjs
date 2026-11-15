@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { yoeForJob } from '../lib/yoe.mjs';
 import { randomUUID } from 'node:crypto';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
@@ -212,8 +213,15 @@ try {
     [company, 'Platform Engineer', link('new-role'), 'Pending'],
   );
   const description = (
-    await rows('SELECT content FROM job_descriptions WHERE job_id=$1', [added.id])
+    await rows('SELECT content, yoe_min, yoe_confidence FROM job_descriptions WHERE job_id=$1', [
+      added.id,
+    ])
   )[0];
+  // D116: the ingest path stored the estimate beside the description.
+  assert.deepEqual(
+    { yoe_min: description.yoe_min, yoe_confidence: description.yoe_confidence },
+    yoeForJob(description.content, 'Platform Engineer'),
+  );
   assert.ok(
     description.content.includes(text),
     'the pasted text is stored byte for byte (CRLF, tabs and trailing spaces)',

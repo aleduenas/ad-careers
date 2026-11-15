@@ -8,6 +8,9 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 
+// Test guard: a test never reaches the configured database (see src/lib/_database.mjs).
+process.env.CAREER_OPS_TEST_GUARD = '1';
+
 const HUGE_ID = '900719925474099312345';
 
 function row(id, status, values = {}) {
@@ -404,4 +407,214 @@ test('D061 cursors are bound to the new filter fields', async () => {
     reader.list({ filter: 'all', limit: '2', scoreMin: '3', cursor: first.nextCursor }),
     { publicCode: 'INVALID_REQUEST' },
   );
+});
+
+test('D114 favorite flag: projected, filters with the other filters, and echoed only when set', async () => {
+  const rows = [
+    row('1', 'Evaluated', { score: '2.0', favorite: true, notes: 'keep' }),
+    row('2', 'Evaluated', { score: '4.5' }),
+    row('3', 'Applied', { score: '1.0', favorite: true }),
+    row('4', 'Evaluated', { score: '3.0', favorite: true }),
+  ];
+  const { reader } = readerFor(rows);
+  const all = await reader.list({ filter: 'any' });
+  assert.deepEqual(
+    all.items.map(item => [item.id, item.favorite]),
+    [
+      ['3', true],
+      ['2', false],
+      ['4', true],
+      ['1', true],
+    ],
+  );
+  assert.equal('favorite' in all.query, false);
+  const only = await reader.list({ filter: 'any', favorite: 'true' });
+  assert.deepEqual(
+    only.items.map(item => item.id),
+    ['3', '4', '1'],
+  );
+  assert.equal(only.query.favorite, true);
+  assert.deepEqual(
+    (await reader.list({ filter: 'evaluated', favorite: 'true', q: 'keep' })).items.map(
+      item => item.id,
+    ),
+    ['1'],
+  );
+  for (const bad of ['false', '1', '', 'yes'])
+    assert.throws(() => normalizeJobsQuery({ favorite: bad }), { publicCode: 'INVALID_REQUEST' });
+});
+
+test('D114 sort=favorite puts favorites first, default order inside each group, and pages stably', async () => {
+  const rows = [
+    row('1', 'Evaluated', { score: '2.0', favorite: true }),
+    row('2', 'Evaluated', { score: '4.5' }),
+    row('3', 'Evaluated', { score: '1.0', favorite: true }),
+    row('4', 'Evaluated', { score: '3.0' }),
+    row('5', 'Evaluated', { score: '3.5', favorite: true }),
+  ];
+  const { reader } = readerFor(rows);
+  const base = { filter: 'any', sort: 'favorite' };
+  const ids = result => result.items.map(item => item.id);
+  assert.deepEqual(ids(await reader.list(base)), ['5', '1', '3', '2', '4']);
+  assert.deepEqual(ids(await reader.list({ ...base, direction: 'asc' })), [
+    '2',
+    '4',
+    '5',
+    '1',
+    '3',
+  ]);
+  const first = await reader.list({ ...base, limit: '2' });
+  const second = await reader.list({ ...base, limit: '2', cursor: first.nextCursor });
+  const third = await reader.list({ ...base, limit: '2', cursor: second.nextCursor });
+  assert.deepEqual([...ids(first), ...ids(second), ...ids(third)], ['5', '1', '3', '2', '4']);
+  assert.equal(third.nextCursor, null);
+  // The cursor is bound to the sort.
+  await assert.rejects(
+    reader.list({ filter: 'any', sort: 'score', limit: '2', cursor: first.nextCursor }),
+    { publicCode: 'INVALID_REQUEST' },
+  );
+});
+
+test('D115 boolean q: legacy plain text is unchanged, operators combine, errors name the problem', async () => {
+  const rows = [
+    row('1', 'Evaluated', { company: 'Acme', role: 'Senior Security Engineer', score: '4' }),
+    row('2', 'Evaluated', { company: 'Beta', role: 'Security AI Engineer', score: '3' }),
+    row('3', 'Evaluated', { company: 'Gamma', role: 'Data Engineer', notes: '100%_x', score: '2' }),
+  ];
+  const { reader, calls } = readerFor(rows);
+  const ids = async q =>
+    (await reader.list({ filter: 'any', q, grouped: 'false' })).items.map(item => item.id);
+  // Legacy path: the same single read query, whole string as one needle, wildcards literal.
+  assert.deepEqual(await ids('security engineer'), ['1']);
+  assert.deepEqual(await ids('100%_x'), ['3']);
+  assert.deepEqual(await ids('%'), ['3']);
+  assert.deepEqual(await ids('security and engineer'), [], 'lowercase and is an ordinary word');
+  assert.ok(
+    calls.every(sql => sql === calls[0]),
+    'one unchanged SELECT for every search',
+  );
+  // Boolean path.
+  assert.deepEqual(await ids('security AND AI'), ['2']);
+  assert.deepEqual(await ids('("security" AND "ai") OR data'), ['2', '3']);
+  assert.deepEqual(await ids('NOT "senior"'), ['2', '3']);
+  assert.deepEqual(await ids('engineer NOT security'), ['3']);
+  assert.deepEqual(await ids('"100%_x"'), ['3']);
+  // Counts, paging, filter and favorite keep working with a boolean q.
+  const page = await reader.list({ filter: 'any', q: 'engineer OR NOT zzz', limit: '2' });
+  assert.equal(page.totalCount, 3);
+  assert.ok(page.nextCursor);
+  const next = await reader.list({
+    filter: 'any',
+    q: 'engineer OR NOT zzz',
+    limit: '2',
+    cursor: page.nextCursor,
+  });
+  assert.equal(next.items.length, 1);
+  assert.equal((await reader.list({ filter: 'pending', q: 'NOT zzz' })).totalCount, 0);
+  // Invalid expressions are a 400 with a q field message.
+  await assert.rejects(reader.list({ q: '(security' }), error => {
+    assert.equal(error.statusCode, 400);
+    assert.equal(error.publicCode, 'INVALID_REQUEST');
+    assert.deepEqual(error.fields, { q: 'Missing closing parenthesis.' });
+    return true;
+  });
+  assert.throws(() => normalizeJobsQuery({ q: 'a AND' }), {
+    fields: { q: 'AND needs a search term after it.' },
+  });
+});
+
+test('D116 years of experience: item fields, yoeMax, yoeUnknown, sort=yoe and stable paging', async () => {
+  const rows = [
+    row('1', 'Evaluated', { score: '4', yoe_min: 5, yoe_confidence: 'high' }),
+    row('2', 'Evaluated', { score: '3', yoe_min: null, yoe_confidence: null }),
+    row('3', 'Evaluated', { score: '2', yoe_min: 2, yoe_confidence: 'inferred' }),
+    row('4', 'Evaluated', { score: '1', yoe_min: 0, yoe_confidence: 'low' }),
+    row('5', 'Evaluated', { score: '5', yoe_min: 8, yoe_confidence: 'medium' }),
+  ];
+  const { reader } = readerFor(rows);
+  const ids = result => result.items.map(item => item.id);
+  const all = await reader.list({ filter: 'any' });
+  assert.deepEqual(
+    all.items.map(item => [item.id, item.yoeMin, item.yoeConfidence]),
+    [
+      ['5', 8, 'medium'],
+      ['1', 5, 'high'],
+      ['2', null, null],
+      ['3', 2, 'inferred'],
+      ['4', 0, 'low'],
+    ],
+  );
+  for (const key of ['yoeMax', 'yoeUnknown', 'posting']) assert.equal(key in all.query, false);
+  // yoeMax keeps jobs at or under N and jobs with no estimate.
+  assert.deepEqual(ids(await reader.list({ filter: 'any', yoeMax: '5' })).sort(), [
+    '1',
+    '2',
+    '3',
+    '4',
+  ]);
+  assert.deepEqual(ids(await reader.list({ filter: 'any', yoeMax: 0 })).sort(), ['2', '4']);
+  assert.equal((await reader.list({ filter: 'any', yoeMax: '5' })).query.yoeMax, 5);
+  assert.deepEqual(
+    ids(await reader.list({ filter: 'any', yoeMax: '5', yoeUnknown: 'exclude' })).sort(),
+    ['1', '3', '4'],
+  );
+  // sort=yoe: ascending by default, no estimate last in both directions, then id.
+  const base = { filter: 'any', sort: 'yoe', grouped: 'false' };
+  assert.deepEqual(ids(await reader.list(base)), ['4', '3', '1', '5', '2']);
+  assert.deepEqual(ids(await reader.list({ ...base, direction: 'desc' })), [
+    '5',
+    '1',
+    '3',
+    '4',
+    '2',
+  ]);
+  const first = await reader.list({ ...base, limit: '2' });
+  const second = await reader.list({ ...base, limit: '2', cursor: first.nextCursor });
+  const third = await reader.list({ ...base, limit: '2', cursor: second.nextCursor });
+  assert.deepEqual([...ids(first), ...ids(second), ...ids(third)], ['4', '3', '1', '5', '2']);
+  assert.equal(third.nextCursor, null);
+  // The cursor is bound to the filter too.
+  await assert.rejects(
+    reader.list({ ...base, yoeMax: '5', limit: '2', cursor: first.nextCursor }),
+    {
+      publicCode: 'INVALID_REQUEST',
+    },
+  );
+  for (const bad of ['-1', '41', '1.5', 'x', '', true, [1]])
+    assert.throws(() => normalizeJobsQuery({ yoeMax: bad }), { publicCode: 'INVALID_REQUEST' });
+  for (const bad of ['include', true, '', 'true'])
+    assert.throws(() => normalizeJobsQuery({ yoeUnknown: bad }), { publicCode: 'INVALID_REQUEST' });
+});
+
+test('D117 posting: latest check on the item, posting=expired and posting=applied-closed', async () => {
+  const check = (state, action) => ({
+    posting_state: state,
+    posting_action: action,
+    posting_checked_at: '2026-11-15T06:00:00Z',
+  });
+  const rows = [
+    row('1', 'Discarded', check('closed', 'discarded')),
+    row('2', 'Discarded', check('open', 'none')),
+    row('3', 'Applied', check('probably_closed', 'flagged')),
+    row('4', 'Applied', check('open', 'none')),
+    row('5', 'Applied', check('closed', 'flagged')),
+    row('6', 'Evaluated', check('closed', 'discarded')),
+    row('7', 'Applied'),
+  ];
+  const { reader } = readerFor(rows);
+  const ids = async posting =>
+    (await reader.list({ filter: 'any', posting, grouped: 'false' })).items.map(item => item.id);
+  assert.deepEqual(await ids('expired'), ['1']);
+  assert.deepEqual((await ids('applied-closed')).sort(), ['3', '5']);
+  const all = await reader.list({ filter: 'any', grouped: 'false' });
+  const byId = new Map(all.items.map(item => [item.id, item.posting]));
+  assert.deepEqual(byId.get('1'), {
+    state: 'closed',
+    action: 'discarded',
+    checkedAt: '2026-11-15T06:00:00Z',
+  });
+  assert.equal(byId.get('7'), null);
+  assert.equal((await reader.list({ filter: 'any', posting: 'expired' })).query.posting, 'expired');
+  for (const bad of ['open', 'true', '', true])
+    assert.throws(() => normalizeJobsQuery({ posting: bad }), { publicCode: 'INVALID_REQUEST' });
 });

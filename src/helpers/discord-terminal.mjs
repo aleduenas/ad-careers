@@ -221,10 +221,7 @@ async function ensureRuntime(command) {
       '-c',
       'developer_instructions=' +
         JSON.stringify(
-          readFileSync(
-            join(root, 'documentation/dashboard-migration/DISCORD_LEAD_PROMPT.md'),
-            'utf8',
-          ),
+          readFileSync(join(root, 'notes/dashboard-migration/DISCORD_LEAD_PROMPT.md'), 'utf8'),
         ),
       ...Object.entries(developmentConfig()).flatMap(([key, value]) => [
         '-c',

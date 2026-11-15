@@ -28,7 +28,7 @@ import {
 import { RESEARCH_SECTIONS } from './_evaluation-plan.mjs';
 import { draftingRoot, temporaryWorker, checkLogin, processRun } from '../lib/cli-runtime.mjs';
 import { renderPrompt } from '../lib/_prompt-templates.mjs';
-import { reportPhase } from '../lib/_task-status.mjs';
+import { reportPhase, setRunOutcome } from '../lib/_task-status.mjs';
 
 import { root } from '../lib/root.mjs';
 const sourceRevision = () => {
@@ -587,7 +587,11 @@ try {
     console.log(
       JSON.stringify({ run_id: state.id, status: state.status, results: state.results }, null, 2),
     );
-    if (state.status !== 'complete') process.exitCode = 2;
+    if (state.status !== 'complete') {
+      // Only location reviews left (no failure): the dashboard shows this run as needing a decision.
+      if (!state.results.some(r => r.status === 'FAILED')) setRunOutcome('LOCATION_REVIEW');
+      process.exitCode = 2;
+    }
   }
 } catch (e) {
   state.status = 'failed';

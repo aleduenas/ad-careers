@@ -44,7 +44,7 @@ export function subscriptionEnv(source = process.env) {
   const env = { ...source };
   for (const key of Object.keys(env))
     if (
-      /^(OPENAI_API_KEY|OPENAI_BASE_URL|ANTHROPIC_API_KEY|ANTHROPIC_AUTH_TOKEN|ANTHROPIC_BASE_URL|CLAUDE_CODE_USE_.*|CLAUDECODE)$/i.test(
+      /^(OPENAI_API_KEY|OPENAI_BASE_URL|ANTHROPIC_API_KEY|ANTHROPIC_AUTH_TOKEN|ANTHROPIC_BASE_URL|CLAUDE_CODE_USE_.*|CLAUDECODE|FIRECRAWL_API_KEY)$/i.test(
         key,
       )
     )

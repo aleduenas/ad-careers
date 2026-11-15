@@ -1,0 +1,146 @@
+/* Batch evaluate on the Jobs page: the bar above the results, the confirm dialog and the status line. */
+
+.batch-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 18px;
+  margin: 14px 0 0;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--paper-soft);
+}
+
+.batch-select-all {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 40px;
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.batch-select-all input,
+.batch-pick input {
+  flex: none;
+  width: 17px;
+  min-height: 0;
+  height: 17px;
+  padding: 0;
+  accent-color: var(--green);
+}
+
+.batch-select-all small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.batch-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* The row checkbox sits in front of the ID in the first column, so the column widths stay put. */
+.batch-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.batch-pick .job-id-text {
+  font-variant-numeric: tabular-nums;
+}
+
+.batch-amount {
+  display: grid;
+  gap: 6px;
+  margin-top: 16px;
+}
+
+.batch-amount label {
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.batch-amount input {
+  max-width: 140px;
+}
+
+.batch-actions {
+  margin-top: 20px;
+}
+
+.batch-status {
+  align-items: flex-start;
+}
+
+.batch-status:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+.batch-status-body {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.batch-status-body p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.batch-status-actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.batch-skipped ul {
+  max-height: 9.5rem;
+  margin: 4px 0 0;
+  padding-left: 18px;
+  overflow: auto;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.batch-skipped a {
+  color: inherit;
+  text-decoration: underline;
+}
+
+@media (max-width: 700px) {
+  .batch-bar {
+    align-items: stretch;
+  }
+
+  .batch-buttons button {
+    flex: 1 1 130px;
+  }
+
+  .batch-status {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .batch-status-actions button {
+    flex: 1 1 120px;
+  }
+}
+
+/* Destructive confirm button: the same red in both themes. */
+.batch-actions .batch-danger {
+  border-color: var(--red);
+  background: var(--red-bg);
+  color: var(--red);
+  font-weight: 700;
+}
+
+.batch-actions .batch-danger:hover:not(:disabled) {
+  filter: brightness(0.97);
+}

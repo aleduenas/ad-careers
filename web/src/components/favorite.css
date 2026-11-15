@@ -1,0 +1,59 @@
+/* The favorite star on Jobs rows and in the workspace header. */
+
+.favorite-wrap {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.favorite-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.favorite-toggle:hover:not([aria-disabled='true']) {
+  border-color: var(--line);
+  background: var(--paper-soft);
+  color: var(--ink);
+}
+
+.favorite-toggle.is-favorite {
+  color: var(--orange);
+}
+
+.favorite-toggle[aria-disabled='true'] {
+  cursor: progress;
+  opacity: 0.7;
+}
+
+.favorite-problem {
+  color: var(--red);
+  font-size: 12px;
+}
+
+/* Jobs table: the star sits at the right edge of the company cell. */
+.jobs-table .job-name.has-favorite {
+  position: relative;
+  padding-right: 46px;
+}
+
+.jobs-table .job-name .favorite-wrap {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+}
+
+/* Workspace header: the star follows the title. */
+.ws-bar-main .favorite-wrap {
+  flex: none;
+}

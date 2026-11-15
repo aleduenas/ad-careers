@@ -2,6 +2,9 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { createGhosting } from './ghosting.mjs';
 
+// Test guard: a test never reaches the configured database (see src/lib/_database.mjs).
+process.env.CAREER_OPS_TEST_GUARD = '1';
+
 const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
 
 test('a pass checks readiness, calls the SQL rule once and logs the count', async () => {

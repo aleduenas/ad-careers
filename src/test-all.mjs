@@ -94,6 +94,9 @@ function run(cmd, args = [], opts = {}) {
       timeout: 60000,
       stdio: ['pipe', 'pipe', 'pipe'],
       ...execOptions,
+      // Every spawned check refuses to connect to a database not named career_ops_test_*
+      // (src/lib/_database.mjs assertTestDatabase), so no test can reach the personal database.
+      env: { ...process.env, ...(execOptions.env ?? {}), CAREER_OPS_TEST_GUARD: '1' },
     }).trim();
   } catch (e) {
     if (diagnostics) console.error(String(e.stderr || e.stdout || e.message).trim());
@@ -181,9 +184,12 @@ console.log('\n4. Data contract validation');
 const systemFiles = [
   'CLAUDE.md',
   'AGENTS.md',
-  'documentation/index.md',
-  'documentation/guides/layout.md',
-  'documentation/guides/DATA_CONTRACT.md',
+  'README.md',
+  'src/README.md',
+  'infra/README.md',
+  'llm/README.md',
+  'config/README.md',
+  'web/README.md',
   'config/examples/profile.example.yml',
   'config/examples/portals.example.yml',
   'src/lib/root.mjs',
@@ -198,7 +204,6 @@ const systemFiles = [
   'web/index.html',
   'web/vite.config.mjs',
   'web/tsconfig.json',
-  'documentation/guides/prompts.md',
   'llm/prompts/cvgen/cv-worksheet.md',
   'llm/prompts/cvgen/cv-repair.md',
   'llm/prompts/cvgen/cover-letter-worksheet.md',
@@ -280,46 +285,22 @@ if (!absFound) {
   pass('No absolute paths in code files');
 }
 
-// ── 6. DOCUMENTATION COVERAGE ──────────────────────────────────
+// ── 6. DOCUMENTATION ───────────────────────────────────────────
 
-console.log('\n6. Documentation coverage');
-const documentedRoots = [
-  'src',
-  'web',
-  'infra',
-  'llm/prompts',
-  'config/examples',
-  '.github/workflows',
-];
-const privatePromptInputs = new Set([
-  'llm/prompts/cvgen/writing-style-guide.txt',
-  'llm/prompts/cvgen/cover-letter-paragraph-worksheet.txt',
-]);
-function documentationSources(dir) {
-  return readdirSync(join(ROOT, dir), { withFileTypes: true }).flatMap(entry => {
-    const path = dir + '/' + entry.name;
-    if (entry.isDirectory()) {
-      const ignoredDirs = new Set(['node_modules', 'logs']);
-      if (dir === 'web' || dir.startsWith('web/'))
-        for (const ignored of WEB_IGNORED_DIRS) ignoredDirs.add(ignored);
-      return ignoredDirs.has(entry.name) ? [] : documentationSources(path);
-    }
-    return !privatePromptInputs.has(path) &&
-      (/\.(mjs|ps1|sql|yml|json|html|md|woff2|js|jsx|ts|tsx|css)$/.test(path) ||
-        path === 'infra/docker/.env.example')
-      ? [path]
-      : [];
-  });
+console.log('\n6. Documentation');
+// D112: the documentation is one concise README per root folder; there are no per-file pages.
+for (const folder of ['src', 'infra', 'llm', 'config', 'web']) {
+  if (fileExists(folder + '/README.md')) pass(folder + '/README.md exists');
+  else fail('Missing ' + folder + '/README.md (every root folder is documented by one README)');
 }
-const documentationSourcesList = documentedRoots.flatMap(documentationSources);
-const missingPages = documentationSourcesList.filter(
-  path => !fileExists('documentation/' + path.replace(/\.[^./]+$/, '') + '.md'),
-);
-for (const path of missingPages) fail(`Missing documentation page for ${path}`);
-if (!missingPages.length)
-  pass(
-    `Documentation pages exist for ${documentationSourcesList.length} source/configuration files`,
+const trackedDocumentation = run('git', ['ls-files', 'documentation']);
+if (trackedDocumentation === null) warn('Could not list tracked files (git unavailable)');
+else if (trackedDocumentation)
+  fail(
+    'Tracked files under documentation/ (the folder was retired): ' +
+      trackedDocumentation.split('\n')[0],
   );
+else pass('No tracked files under documentation/');
 
 // ── 7. AGENTS.md INTEGRITY ──────────────────────────────────────
 
@@ -333,7 +314,7 @@ const requiredSections = [
   'Private data stays private',
   'JD policy',
   'Ethical use',
-  'Documentation is part of the change',
+  'Documentation is one concise README',
   'hiring.cafe provider contract',
 ];
 

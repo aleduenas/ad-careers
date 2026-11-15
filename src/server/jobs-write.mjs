@@ -7,7 +7,7 @@ import {
   transaction as databaseTransaction,
   urlKey,
 } from '../lib/_database.mjs';
-import { withJobID } from '../lib/_job-descriptions.mjs';
+import { recordYoe, withJobID } from '../lib/_job-descriptions.mjs';
 import { root as repositoryRoot } from '../lib/root.mjs';
 import { DatabaseUnavailableError, SchemaNotReadyError } from './readiness.mjs';
 
@@ -354,9 +354,10 @@ export function createJobsWrite({
           const result = await client.query(sql, args);
           return Array.isArray(result) ? result : (result?.rows ?? []);
         };
-        const [job] = await run('SELECT id, jd_path FROM jobs WHERE id = $1::bigint FOR UPDATE', [
-          id,
-        ]);
+        const [job] = await run(
+          'SELECT id, jd_path, role FROM jobs WHERE id = $1::bigint FOR UPDATE',
+          [id],
+        );
         if (!job) throw notFound();
         const [current] = await run(
           'SELECT content, content_hash, revision::text AS revision, file_path, synced_at ' +
@@ -382,16 +383,24 @@ export function createJobsWrite({
         }
         const filePath = safeJdPath(current?.file_path ?? job.jd_path, id);
         if (current && current.content === tagged && current.file_path === filePath)
-          return { row: current, filePath, changed: false };
+          return { row: current, filePath, changed: false, role: job.role };
         const [row] = await run('SELECT * FROM sync_job_description($1::bigint, $2, $3, $4)', [
           id,
           tagged,
           filePath,
           hash,
         ]);
-        return { row, filePath, changed: true };
+        return { row, filePath, changed: true, role: job.role };
       }),
     );
+    if (committed.changed) {
+      // D116: refresh the years-of-experience estimate after the commit; never fails the edit.
+      try {
+        await recordYoe(id, tagged, committed.role, query);
+      } catch {
+        // The estimate is optional; the saved text stands.
+      }
+    }
     let cacheSync = 'ok';
     try {
       await writeJdCache(rootDir, committed.filePath, tagged, fs);
@@ -407,7 +416,24 @@ export function createJobsWrite({
     };
   }
 
-  return Object.freeze({ changeStatus, updateMetadata, saveJd });
+  // The favorite flag is a label: one idempotent UPDATE of that column only. No revision check,
+  // no revision bump and no status event, so it never conflicts with an open edit.
+  async function setFavorite(id, body) {
+    checkId(id);
+    onlyKeys(body, ['favorite']);
+    if (typeof body.favorite !== 'boolean') throw invalid('favorite');
+    return guarded(async () => {
+      const rows = await query(
+        'UPDATE jobs SET favorite = $2 WHERE id = $1::bigint RETURNING id::text AS id, favorite',
+        [id, body.favorite],
+      );
+      const row = Array.isArray(rows) ? rows[0] : rows?.rows?.[0];
+      if (!row) throw notFound();
+      return { id: String(row.id), favorite: row.favorite === true };
+    });
+  }
+
+  return Object.freeze({ changeStatus, updateMetadata, saveJd, setFavorite });
 }
 
 function onlyKeysNested(value, allowed, field) {

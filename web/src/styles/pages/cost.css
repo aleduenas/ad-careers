@@ -1,0 +1,226 @@
+/* The cost page. */
+
+/* Package 4.7: Cost page. Flat panes, green tokens, plain CSS bars. */
+.cost-page {
+  display: grid;
+  gap: 18px;
+}
+
+.cost-bar-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+.cost-bar-controls .filter-chips,
+.cost-toggle {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.cost-bar-controls button[aria-pressed='true'] {
+  border-color: var(--green);
+  background: var(--green-bg);
+  color: var(--green);
+  font-weight: 700;
+}
+
+.cost-note {
+  margin: 0;
+}
+
+.cost-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.cost-card {
+  display: grid;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--paper);
+}
+
+.cost-card span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.cost-card strong {
+  font-size: 22px;
+  font-variant-numeric: tabular-nums;
+}
+
+.cost-section {
+  display: grid;
+  gap: 8px;
+}
+
+.cost-section h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.cost-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.cost-table th,
+.cost-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.cost-table thead th {
+  background: var(--paper-soft);
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.cost-table tbody th {
+  font-weight: 600;
+}
+
+.cost-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.cost-nowrap {
+  white-space: nowrap;
+}
+
+.cost-sub {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+
+.cost-days-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.cost-days {
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
+  min-width: calc(var(--days, 1) * 18px);
+  height: 190px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cost-days li {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  min-width: 0;
+  height: 100%;
+}
+
+.cost-bar-slot {
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  width: 100%;
+  flex: 1 1 auto;
+  border-radius: 4px;
+}
+
+.cost-bar {
+  display: block;
+  width: 100%;
+  height: var(--bar);
+  min-height: 2px;
+  border-radius: 3px 3px 0 0;
+  background: var(--green);
+}
+
+.cost-bar-value {
+  position: absolute;
+  bottom: calc(var(--bar) + 6px);
+  left: 50%;
+  z-index: 2;
+  display: none;
+  padding: 3px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+  box-shadow: 0 2px 8px rgb(0 0 0 / 15%);
+  font-size: 12px;
+  white-space: nowrap;
+  transform: translateX(-50%);
+}
+
+.cost-bar-slot:hover .cost-bar-value,
+.cost-bar-slot:focus-visible .cost-bar-value {
+  display: block;
+}
+
+.cost-days li:first-child .cost-bar-value {
+  left: 0;
+  transform: none;
+}
+
+.cost-days li:last-child .cost-bar-value {
+  right: 0;
+  left: auto;
+  transform: none;
+}
+
+.cost-day-label {
+  min-height: 12px;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.cost-days-table summary {
+  cursor: pointer;
+  color: var(--green);
+  font-size: 13px;
+}
+
+.cost-est {
+  margin-left: 4px;
+  color: var(--muted);
+  font-size: 10px;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0.02em;
+}
+
+.cost-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 0 4px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.cost-switch input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--green);
+}

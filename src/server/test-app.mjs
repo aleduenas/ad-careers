@@ -1,3 +1,4 @@
+import { readFile } from 'node:fs/promises';
 import assert from 'node:assert/strict';
 import { Readable } from 'node:stream';
 import test from 'node:test';
@@ -5,6 +6,9 @@ import { createApp, requireSessionNonce } from './app.mjs';
 import { createReadinessCheck } from './readiness.mjs';
 import { publicSchemas } from './schemas.mjs';
 import { DatabaseUnavailableError, SchemaNotReadyError } from './readiness.mjs';
+
+// Test guard: a test never reaches the configured database (see src/lib/_database.mjs).
+process.env.CAREER_OPS_TEST_GUARD = '1';
 
 const host = '127.0.0.1:4310';
 const origin = `http://${host}`;
@@ -89,6 +93,10 @@ function detailFixture(id = '7') {
       addedDate: null,
       statusDate: null,
       discardReason: null,
+      favorite: false,
+      yoeMin: null,
+      yoeConfidence: null,
+      posting: null,
       salary: null,
       compensation: { text: null, state: 'missing' },
       materials: { cv: true, letter: false },
@@ -196,6 +204,7 @@ function injectedWriter(overrides = {}) {
   const job = detailFixture().job;
   return {
     changeStatus: async (id, body) => ({ job: { ...job, id, status: body.status } }),
+    setFavorite: async (id, body) => ({ id, favorite: body.favorite }),
     updateMetadata: async (id, body) => ({ job: { ...job, id, company: String(body.value) } }),
     saveJd: async (id, body) => ({
       job: { ...job, id },
@@ -315,11 +324,14 @@ test('public schema exports are standalone serializable schemas with the contrac
     'JobsResponse',
     'OverviewResponse',
     'JobDetailResponse',
+    'LivenessSummaryResponse',
     'JobMaterialParams',
     'JobStatusRequest',
     'JobMetadataRequest',
     'JobJdRequest',
     'JobWriteResponse',
+    'JobFavoriteRequest',
+    'JobFavoriteResponse',
     'JobJdWriteResponse',
     'ProvidersSettingsResponse',
     'ProvidersPutRequest',
@@ -340,6 +352,10 @@ test('public schema exports are standalone serializable schemas with the contrac
     'LetterResponse',
     'RunCreateRequest',
     'RunCreateResponse',
+    'RunBatchRequest',
+    'RunBatchResponse',
+    'RunCancelQueuedRequest',
+    'RunCancelQueuedResponse',
     'RunsResponse',
     'RunResponse',
     'RunLogResponse',
@@ -2028,5 +2044,205 @@ test('cost routes validate queries strictly, stay read-only and report capabilit
       });
       assert.equal(calls.json().error.code, 'SCHEMA_NOT_READY');
     },
+  );
+});
+
+test('batch evaluate and cancel-queued routes: nonce, body schema, status codes', async () => {
+  const group = '11111111-2222-4333-8444-666666666666';
+  const runs = injectedRuns({
+    dispatchEvaluateBatch: async input => ({
+      groupId: group,
+      runs: [runFixture({ groupId: group })],
+      skipped: input.jobIds?.includes('404') ? [{ jobId: '404', reason: 'Job not found.' }] : [],
+      replayed: input.requestKey === 'replay',
+    }),
+    cancelQueued: async groupId => ({ groupId, cancelled: 2 }),
+  });
+  await withApp({ nonce: NONCE, runsService: runs }, async app => {
+    const post = (url, headers, payload) => app.inject({ method: 'POST', url, headers, payload });
+    const batch = '/api/v1/runs/evaluate-batch';
+    const ok = await post(
+      batch,
+      postHeaders,
+      JSON.stringify({ requestKey: 'k-b', jobIds: ['1', '404'] }),
+    );
+    assert.equal(ok.statusCode, 201);
+    assert.equal(ok.json().data.runs.length, 1);
+    assert.deepEqual(ok.json().data.skipped, [{ jobId: '404', reason: 'Job not found.' }]);
+    const replay = await post(
+      batch,
+      postHeaders,
+      JSON.stringify({ requestKey: 'replay', next: 2 }),
+    );
+    assert.equal(replay.statusCode, 200);
+    const { 'x-career-ops-session': _omit, ...noNonce } = postHeaders;
+    const bare = await post(batch, noNonce, JSON.stringify({ requestKey: 'k', next: 1 }));
+    assert.equal(bare.statusCode, 403);
+    for (const payload of [
+      '{}',
+      JSON.stringify({ requestKey: 'k', next: 1, jobIds: ['1'] }),
+      JSON.stringify({ requestKey: 'k', jobIds: ['1', '1'] }),
+      JSON.stringify({ requestKey: 'k', next: 101 }),
+      JSON.stringify({ requestKey: 'k', next: 1, extra: 1 }),
+    ])
+      assert.equal((await post(batch, postHeaders, payload)).statusCode, 400, payload);
+
+    const cancelUrl = `/api/v1/runs/groups/${group}/cancel-queued`;
+    const cancel = await post(cancelUrl, postHeaders, '{}');
+    assert.equal(cancel.statusCode, 200);
+    assert.deepEqual(cancel.json().data, { groupId: group, cancelled: 2 });
+    assert.equal((await post(cancelUrl, noNonce, '{}')).statusCode, 403);
+  });
+});
+
+test('PUT favorite goes through the write guard, validates the body and returns { id, favorite }', async () => {
+  await withApp(
+    { nonce: WRITE_NONCE, jobsWriter: injectedWriter(), runsService: null },
+    async app => {
+      const url = '/api/v1/jobs/7/favorite';
+      const send = (headers, payload, target = url) =>
+        app.inject({ method: 'PUT', url: target, headers, payload });
+      const ok = await send(writeHeaders, JSON.stringify({ favorite: true }));
+      assert.equal(ok.statusCode, 200);
+      assert.deepEqual(ok.json().data, { id: '7', favorite: true });
+      const { 'x-career-ops-session': _omit, ...noNonce } = writeHeaders;
+      assert.equal((await send(noNonce, JSON.stringify({ favorite: true }))).statusCode, 403);
+      for (const payload of [
+        '{}',
+        '{',
+        JSON.stringify({ favorite: 'yes' }),
+        JSON.stringify({ favorite: true, x: 1 }),
+      ])
+        assert.equal((await send(writeHeaders, payload)).statusCode, 400, payload);
+      const unavailable = await withApp(
+        { nonce: WRITE_NONCE, jobsWriter: null, runsService: null },
+        async bare => {
+          const response = await bare.inject({
+            method: 'PUT',
+            url,
+            headers: writeHeaders,
+            payload: JSON.stringify({ favorite: true }),
+          });
+          assert.equal(response.statusCode, 503);
+        },
+      );
+      assert.equal(unavailable, undefined);
+    },
+  );
+});
+
+test('the serialized list item and detail job on the wire contain the favorite flag', async () => {
+  const { notes: _n, evaluationError: _e, ...item } = detailFixture().job;
+  const reader = injectedReader({
+    list: async query => ({
+      ...(await injectedReader().list(query)),
+      items: [{ ...item, favorite: true }],
+      totalCount: 1,
+    }),
+  });
+  const detail = injectedDetail({
+    detail: async id => {
+      const fixture = detailFixture(id);
+      return { ...fixture, job: { ...fixture.job, favorite: true } };
+    },
+  });
+  await withApp({ jobsReader: reader, jobDetailReader: detail, runsService: null }, async app => {
+    const list = await app.inject({ method: 'GET', url: '/api/v1/jobs', headers: { host } });
+    assert.equal(list.statusCode, 200);
+    const items = JSON.parse(list.body).data.items;
+    assert.ok(items.length > 0);
+    assert.ok(items.every(item => item.favorite === true));
+    const one = await app.inject({ method: 'GET', url: '/api/v1/jobs/7', headers: { host } });
+    assert.equal(one.statusCode, 200);
+    assert.equal(JSON.parse(one.body).data.job.favorite, true);
+  });
+});
+
+test('liveness: POST /runs accepts the liveness variant and GET /liveness/summary is served', async () => {
+  const dispatched = [];
+  const runs = injectedRuns({
+    dispatch: async input => {
+      dispatched.push(input);
+      return {
+        runs: [runFixture({ action: 'liveness', jobId: input.jobId ?? null })],
+        replayed: false,
+      };
+    },
+  });
+  const summary = {
+    running: false,
+    lastFullCheck: {
+      finishedAt: '2026-11-15T05:00:00.000Z',
+      checked: 10,
+      open: 6,
+      closed: 3,
+      probablyClosed: 1,
+      unknown: 0,
+      discarded: 2,
+      flagged: 2,
+      heldBack: 1,
+    },
+  };
+  await withApp(
+    { nonce: NONCE, runsService: runs, livenessService: { summary: async () => summary } },
+    async app => {
+      const post = payload =>
+        app.inject({
+          method: 'POST',
+          url: '/api/v1/runs',
+          headers: postHeaders,
+          payload: JSON.stringify(payload),
+        });
+      assert.equal((await post({ action: 'liveness', requestKey: 'lv-1' })).statusCode, 201);
+      assert.equal(
+        (await post({ action: 'liveness', requestKey: 'lv-2', jobId: '7' })).statusCode,
+        201,
+      );
+      assert.deepEqual(dispatched, [
+        { action: 'liveness', requestKey: 'lv-1' },
+        { action: 'liveness', requestKey: 'lv-2', jobId: '7' },
+      ]);
+      for (const bad of [
+        { action: 'liveness' },
+        { action: 'liveness', requestKey: 'k', jobId: '0' },
+        { action: 'liveness', requestKey: 'k', dryRun: true },
+      ])
+        assert.equal((await post(bad)).statusCode, 400, JSON.stringify(bad));
+      const read = await app.inject({
+        method: 'GET',
+        url: '/api/v1/liveness/summary',
+        headers: { host },
+      });
+      assert.equal(read.statusCode, 200);
+      assert.deepEqual(read.json().data, summary);
+      const query = await app.inject({
+        method: 'GET',
+        url: '/api/v1/liveness/summary?x=1',
+        headers: { host },
+      });
+      assert.equal(query.statusCode, 400);
+    },
+  );
+  // Without a service the summary is empty, never an error.
+  await withApp({ runsService: null }, async app => {
+    const read = await app.inject({
+      method: 'GET',
+      url: '/api/v1/liveness/summary',
+      headers: { host },
+    });
+    assert.deepEqual(read.json().data, { running: false, lastFullCheck: null });
+  });
+});
+
+test('the daily posting check is off by default: the switch is false and guards the only start call', async () => {
+  const { LIVENESS_DAILY_ENABLED } = await import('./app.mjs');
+  assert.equal(LIVENESS_DAILY_ENABLED, false);
+  const source = await readFile(new URL('./app.mjs', import.meta.url), 'utf8');
+  const starts = source.match(/livenessService\.start\(\)/g) ?? [];
+  assert.equal(starts.length, 1);
+  assert.match(source, /daily:\s*LIVENESS_DAILY_ENABLED\s*&&/);
+  assert.match(
+    source,
+    /if \(LIVENESS_DAILY_ENABLED && livenessService[^)]*\)\s*livenessService\.start\(\)/,
   );
 });

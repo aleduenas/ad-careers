@@ -244,6 +244,19 @@ try {
      VALUES (102,'Synthetic description','jds/synthetic.md','synthetic-hash')`,
   );
 
+  // D116/D117 fixtures: one estimate, and posting checks where only the latest one counts.
+  await admin.query(
+    "UPDATE job_descriptions SET yoe_min = 4, yoe_confidence = 'medium' WHERE job_id = 102",
+  );
+  await admin.query(
+    `INSERT INTO posting_checks (job_id,state,method,detail,action,checked_at) VALUES
+      (106,'open','fixture','', 'none','2026-11-01T00:00:00Z'),
+      (106,'closed','fixture','gone','discarded','2026-11-02T00:00:00Z'),
+      ($1,'open','fixture','','none','2026-11-01T00:00:00Z'),
+      ($1,'probably_closed','fixture','soft','flagged','2026-11-03T12:00:00Z')`,
+    [large.id],
+  );
+
   const materialCalls = [];
   let readClient = pool;
   const reader = createJobsReader({
@@ -298,6 +311,37 @@ try {
   assert.equal(salary.compensation.state, 'manual');
   assert.equal(all.items.find(item => item.id === '111').salary.max, null);
 
+  const yoeItem = all.items.find(item => item.id === '102');
+  assert.equal(yoeItem.yoeMin, 4);
+  assert.equal(yoeItem.yoeConfidence, 'medium');
+  assert.equal(yoeItem.posting, null);
+  assert.deepEqual(all.items.find(item => item.id === '106').posting, {
+    state: 'closed',
+    action: 'discarded',
+    checkedAt: '2026-11-02T00:00:00Z',
+  });
+  assert.equal(all.items.find(item => item.id === large.id).posting.state, 'probably_closed');
+  assert.equal(all.items.find(item => item.id === '103').yoeMin, null);
+  assert.deepEqual(
+    (await reader.list({ filter: 'any', posting: 'expired' })).items.map(item => item.id),
+    ['106'],
+  );
+  assert.deepEqual(
+    (await reader.list({ filter: 'any', posting: 'applied-closed' })).items.map(item => item.id),
+    [large.id],
+  );
+  assert.deepEqual(
+    (await reader.list({ filter: 'any', yoeUnknown: 'exclude' })).items.map(item => item.id),
+    ['102'],
+  );
+  const everyJob = (await reader.list({ filter: 'any' })).totalCount;
+  assert.equal((await reader.list({ filter: 'any', yoeMax: '3' })).totalCount, everyJob - 1);
+  assert.equal((await reader.list({ filter: 'any', yoeMax: '4' })).totalCount, everyJob);
+  assert.equal(
+    (await reader.list({ filter: 'any', sort: 'yoe', grouped: 'false' })).items[0].id,
+    '102',
+  );
+
   const pending = await reader.list({ filter: 'pending' });
   assert.equal(pending.totalCount, 2);
   assert.equal(
@@ -343,6 +387,52 @@ try {
   }
   assert.equal((await reader.list({ q: '%_', grouped: false })).totalCount, 1);
   assert.equal((await reader.list({ q: 'not present', grouped: false })).totalCount, 0);
+
+  // D115 boolean search against the real rows: each operator is checked against set algebra on
+  // single-term results, so the fixtures need not be known by heart.
+  {
+    const ids = async q =>
+      new Set((await reader.list({ q, grouped: false, limit: 200 })).items.map(item => item.id));
+    const universe = await ids('');
+    const cafe = await ids('café');
+    const hundred = await ids('"100%_match"');
+    const discard = await ids('"latest discard reason"');
+    assert(cafe.has(large.id) && hundred.has(large.id) && discard.has('106'));
+    const same = (actual, expected, label) =>
+      assert.deepEqual([...actual].sort(), [...expected].sort(), label);
+    same(
+      await ids('café AND "100%_match"'),
+      [...cafe].filter(id => hundred.has(id)),
+      'AND is the intersection',
+    );
+    same(await ids('café "100%_match"'), await ids('café AND "100%_match"'), 'implicit AND');
+    same(
+      await ids('café OR "latest discard reason"'),
+      new Set([...cafe, ...discard]),
+      'OR is the union',
+    );
+    same(
+      await ids('NOT café'),
+      [...universe].filter(id => !cafe.has(id)),
+      'NOT is the complement',
+    );
+    same(
+      await ids('(café OR "latest discard reason") AND NOT "100%_match"'),
+      [...new Set([...cafe, ...discard])].filter(id => !hundred.has(id)),
+      'parentheses group',
+    );
+    same(
+      await ids('NOT (café OR "latest discard reason")'),
+      [...universe].filter(id => !cafe.has(id) && !discard.has(id)),
+      'NOT over a group',
+    );
+    const counted = await reader.list({ q: 'NOT café', grouped: false });
+    assert.equal(counted.totalCount, universe.size - cafe.size, 'counts follow the expression');
+    await assert.rejects(
+      reader.list({ q: '(café' }),
+      error => error.fields?.q === 'Missing closing parenthesis.',
+    );
+  }
 
   const grouped = await reader.list({
     sort: 'score',

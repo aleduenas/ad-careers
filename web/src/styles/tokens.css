@@ -1,0 +1,88 @@
+/* Design tokens: the light palette on :root and the dark palette on :root[data-theme="dark"]. */
+
+:root {
+  color-scheme: light;
+  /* F17: the page background is a green-tinted grey so margins read as margins; surfaces stay white. */
+  --page: #e3ebe7;
+  --paper: #ffffff;
+  --paper-soft: #f0f4f2;
+  --ink: #202936;
+  --muted: #5a6573;
+  --line: #cdd8d3;
+  --nav: #172b2a;
+  --nav-ink: #dbe6e1;
+  --nav-muted: #a4b9b0;
+  --green: #236c54;
+  --green-hover: #194d3d;
+  --green-bg: #e6f4ec;
+  --blue: #315b9c;
+  --blue-bg: #edf3ff;
+  --orange: #92561c;
+  --orange-bg: #fff3df;
+  --red: #a3353c;
+  --red-bg: #fff0f0;
+  --focus: #21775d;
+  --radius: 12px;
+  /* Page gutters and the widest comfortable content, shared by the pages that adopt them. */
+  --gutter: 16px;
+  --content-max: 1600px;
+  font:
+    14px/1.5 'Segoe UI',
+    system-ui,
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+  color: var(--ink);
+  background: var(--page);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --page: #090e0c;
+  --paper: #1a2520;
+  --paper-soft: #202c26;
+  --ink: #e4ece8;
+  --muted: #b2c0b9;
+  --line: #35443d;
+  --nav: #10201c;
+  --nav-ink: #e0ebe5;
+  --nav-muted: #b2c9bd;
+  --green: #91e0b7;
+  --green-hover: #a8ebc8;
+  --green-bg: #203c30;
+  --blue: #b6ceff;
+  --blue-bg: #22334d;
+  --orange: #ffd08a;
+  --orange-bg: #43331e;
+  --red: #ffb8bd;
+  --red-bg: #44262b;
+  --focus: #9ce6c1;
+}
+
+.search-control,
+.jobs-controls > label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.task-extra-error {
+  color: var(--red);
+}
+
+@media (min-width: 701px) {
+  /* Package 4.3 F12: breathing room in the workspace; F13: Add a job on the Jobs page; F14: details. */
+  :root {
+    --gutter: 32px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --gutter: 44px;
+  }
+}

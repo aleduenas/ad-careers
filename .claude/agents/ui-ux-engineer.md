@@ -13,7 +13,7 @@ new screen inside that system and judge built pages against it.
 
 ## Read first
 
-`documentation/dashboard-migration/design/DESIGN.md`, `design/FRONTEND_STYLE_CONTRACT.md`, the
+`notes/dashboard-migration/design/DESIGN.md`, `design/FRONTEND_STYLE_CONTRACT.md`, the
 prototype under `design/prototype/`, `ROADMAP.md` section 3 and your package brief.
 
 ## Rules

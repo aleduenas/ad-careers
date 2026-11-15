@@ -33,6 +33,8 @@ for (const file of [
   'src/server/test-runs-service-database.mjs',
   'src/server/test-jobs-write-database.mjs',
   'src/server/test-intake-database.mjs',
+  'src/scan/test-liveness-database.mjs',
+  'src/helpers/test-backfill-yoe.mjs',
   'src/eval/test-evaluation-cli.mjs',
   'src/cvgen/test-drafting-integration.mjs',
   'src/helpers/test-backup-restore.mjs',

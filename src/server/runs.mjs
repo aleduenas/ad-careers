@@ -6,6 +6,7 @@ import { homedir } from 'node:os';
 import { basename, join } from 'node:path';
 import { query as databaseQuery } from '../lib/_database.mjs';
 import { resolveCommand } from '../lib/cli-runtime.mjs';
+import { slug as companySlug } from '../eval/_evaluation-cli.mjs';
 import { root as repositoryRoot } from '../lib/root.mjs';
 import { DatabaseUnavailableError, SchemaNotReadyError } from './readiness.mjs';
 import { createRunsStore, RunsStoreError } from './runs-store.mjs';
@@ -24,6 +25,7 @@ export const LAUNCHERS = Object.freeze({
   letter: ['src', 'cvgen', 'draft-cover-letter.mjs'],
   scan: ['src', 'scan', 'scan.mjs'],
   publish: ['src', 'cvgen', 'publish-cover-letter.mjs'],
+  liveness: ['src', 'scan', 'liveness.mjs'],
 });
 const REQUEST_ACTIONS = new Set([...Object.keys(LAUNCHERS), 'both']);
 const ID_PATTERN = /^[1-9][0-9]{0,18}$/;
@@ -43,6 +45,9 @@ const OVERRIDE_KEYS = {
   both: ['cv', 'coverLetter'],
 };
 const QUEUED_STALE_MS = 5 * 60 * 1000;
+// At most this many runs of one evaluate batch run at once; the rest wait queued in memory.
+const BATCH_CONCURRENCY = 2;
+const BATCH_MAX = 100;
 const MAX_REPORT_BYTES = 2 * 1024 * 1024;
 
 // Public projection of a scan.mjs coverage report: counts, a redacted reason per company and the
@@ -400,6 +405,8 @@ export function createRunsService({
   letterService = null,
   legacy: injectedLegacy,
   intervalMs = DEFAULT_INTERVAL_MS,
+  batchConcurrency = BATCH_CONCURRENCY,
+  pendingJobIds = null,
   onError = () => {},
 } = {}) {
   const runs = store || createRunsStore({ query });
@@ -448,11 +455,12 @@ export function createRunsService({
   const lookupJob =
     findJob ||
     (async id => {
-      const rows = await query('SELECT id::text AS id, status FROM jobs WHERE id = $1::bigint', [
-        id,
-      ]);
+      const rows = await query(
+        'SELECT id::text AS id, status, company FROM jobs WHERE id = $1::bigint',
+        [id],
+      );
       return Array.isArray(rows) && rows[0]
-        ? { id: String(rows[0].id), status: rows[0].status }
+        ? { id: String(rows[0].id), status: rows[0].status, company: rows[0].company }
         : null;
     });
   const logDir = join(rootDir, 'logs', 'dashboard');
@@ -483,6 +491,19 @@ export function createRunsService({
         dryRun: input.dryRun,
         company,
       };
+    }
+    if (input.action === 'liveness') {
+      for (const key of Object.keys(input))
+        if (!['action', 'requestKey', 'jobId'].includes(key)) throw invalid(key);
+      if (typeof input.requestKey !== 'string' || !KEY_PATTERN.test(input.requestKey))
+        throw invalid('requestKey');
+      let jobId = null;
+      if (input.jobId !== undefined && input.jobId !== null) {
+        if (typeof input.jobId !== 'string' || !ID_PATTERN.test(input.jobId))
+          throw invalid('jobId');
+        jobId = input.jobId;
+      }
+      return { action: 'liveness', jobId, requestKey: input.requestKey };
     }
     if (input.action === 'publish') {
       for (const key of Object.keys(input))
@@ -616,7 +637,15 @@ export function createRunsService({
     return runs.finish(run.id, 'failed', null, 'SPAWN_FAILED');
   }
 
-  async function launch(run, { publishPath } = {}) {
+  // `onDone` fires once when the worker has exited or never started (frees a batch slot).
+  async function launch(run, { publishPath, onDone } = {}) {
+    const done = () => {
+      try {
+        onDone?.();
+      } catch (error) {
+        onError(error);
+      }
+    };
     const script = join(rootDir, ...LAUNCHERS[run.action]);
     const logPath = join(logDir, run.logRef);
     const recordPath = join(recordDir, `${run.logRef.replace(/\.log$/, '')}.json`);
@@ -629,14 +658,16 @@ export function createRunsService({
       const args =
         run.action === 'publish'
           ? [script, publishPath]
-          : run.action === 'scan'
-            ? [
-                script,
-                ...(run.selection?.dryRun ? ['--dry-run'] : []),
-                ...(run.selection?.company ? [`--company=${run.selection.company}`] : []),
-                `--report-json=${join('logs', 'dashboard', scanReportName(run.logRef))}`,
-              ]
-            : [script, `--job=${run.jobId}`, ...selectionFlags(run.action, run.selection)];
+          : run.action === 'liveness'
+            ? [script, run.jobId ? `--job=${run.jobId}` : '--all']
+            : run.action === 'scan'
+              ? [
+                  script,
+                  ...(run.selection?.dryRun ? ['--dry-run'] : []),
+                  ...(run.selection?.company ? [`--company=${run.selection.company}`] : []),
+                  `--report-json=${join('logs', 'dashboard', scanReportName(run.logRef))}`,
+                ]
+              : [script, `--job=${run.jobId}`, ...selectionFlags(run.action, run.selection)];
       child = spawn(process.execPath, args, {
         cwd: rootDir,
         detached: true,
@@ -647,7 +678,11 @@ export function createRunsService({
       await waitForSpawn(child);
     } catch {
       if (fd !== undefined) closeSync(fd);
-      return failSpawn(run);
+      try {
+        return await failSpawn(run);
+      } finally {
+        done();
+      }
     }
     // From here a worker exists, so nothing below may throw before its pid is recorded and its
     // exit is observed. While this server lives it observes the exit, so a worker whose own
@@ -657,7 +692,8 @@ export function createRunsService({
       const ok = code === 0;
       runs
         .finish(run.id, ok ? 'completed' : 'failed', code ?? null, ok ? null : 'EXIT_NONZERO')
-        .catch(onError);
+        .catch(onError)
+        .finally(done);
     });
     child.unref();
     let running = run;
@@ -699,6 +735,14 @@ export function createRunsService({
       try {
         const active = await activeScanRun();
         if (active) throw discoveryBusy(active.id);
+        // A whole-board posting check is discovery work too: a scan waits for it.
+        const checking = (await runs.list({ limit: 0 })).find(
+          run =>
+            run.action === 'liveness' &&
+            run.jobId === null &&
+            ['queued', 'running'].includes(run.state),
+        );
+        if (checking) throw discoveryBusy(checking.id);
         const stamp = now()
           .toISOString()
           .replace(/[-:]/g, '')
@@ -721,6 +765,73 @@ export function createRunsService({
         release();
       }
     });
+  }
+
+  // Posting check (D117): one job or the whole board. The whole-board run never overlaps another
+  // liveness run or a scan; a single-job run never overlaps another run of that job.
+  async function dispatchLiveness({ requestKey, jobId }) {
+    return serialized(() =>
+      guarded(async () => {
+        if (jobId && !(await lookupJob(jobId))) throw notFound();
+        const same = existing => existing.action === 'liveness' && existing.jobId === jobId;
+        let existing = await runs.getByRequestKey(requestKey);
+        if (existing) {
+          if (!same(existing))
+            throw mapFailure(new RunsStoreError('REQUEST_KEY_CONFLICT', 'conflict'));
+          return { runs: [toWireRun(existing)], replayed: true };
+        }
+        const release = jobId ? () => {} : discoveryLock.tryAcquire('liveness');
+        if (!release) throw discoveryBusy(null);
+        try {
+          const active = (await runs.list(jobId ? { jobId } : { limit: 0 })).filter(run =>
+            ['queued', 'running'].includes(run.state),
+          );
+          const busy = jobId
+            ? active[0]
+            : active.find(run => run.action === 'liveness' && run.jobId === null);
+          if (busy)
+            throw publicError(
+              409,
+              'RUN_ACTIVE',
+              `A ${busy.action} run is already active.`,
+              undefined,
+              false,
+              { activeRunId: busy.id },
+            );
+          if (!jobId) {
+            const scan = await activeScanRun();
+            if (scan) throw discoveryBusy(scan.id);
+          }
+          const stamp = now()
+            .toISOString()
+            .replace(/[-:]/g, '')
+            .replace(/\..*$/, '')
+            .replace('T', '-');
+          const logRef = `liveness-${jobId ?? 'all'}-${stamp}-${randomBytes(4).toString('hex')}.log`;
+          let run;
+          try {
+            run = await runs.insert({
+              requestKey,
+              groupId: null,
+              action: 'liveness',
+              jobId,
+              logRef,
+              selection: {},
+            });
+          } catch (error) {
+            if (error instanceof RunsStoreError && error.code === 'REQUEST_KEY_CONFLICT') {
+              existing = await runs.getByRequestKey(requestKey);
+              if (existing && same(existing))
+                return { runs: [toWireRun(existing)], replayed: true };
+            }
+            throw error;
+          }
+          return { runs: [toWireRun(await launch(run))], replayed: false };
+        } finally {
+          release();
+        }
+      }),
+    );
   }
 
   async function activeScanRun() {
@@ -811,11 +922,13 @@ export function createRunsService({
   async function dispatch(input) {
     const validated = validateCreate(input);
     if (validated.action === 'scan') return dispatchScan(validated);
+    if (validated.action === 'liveness') return dispatchLiveness(validated);
     if (validated.action === 'publish') return dispatchPublish(validated);
     const { action, jobId, requestKey, override } = validated;
     return serialized(() =>
       guarded(async () => {
-        if (!(await lookupJob(jobId))) throw notFound();
+        const job = await lookupJob(jobId);
+        if (!job) throw notFound();
         const tasks = action === 'both' ? ['cv', 'letter'] : [action];
         const groupId = tasks.length > 1 ? randomUUID() : null;
         const keyOf = task => (tasks.length > 1 ? `${requestKey}:${task}` : requestKey);
@@ -882,11 +995,232 @@ export function createRunsService({
             throw error;
           }
           replayed = false;
-          results.push(await launch(run));
+          // A single evaluate is never held back, but its company holds waiting batch runs.
+          results.push(await launch(run, task === 'evaluate' ? holdCompany(job) : {}));
         }
         return { runs: results.map(toWireRun), replayed };
       }),
     );
+  }
+
+  // ---- Evaluate batches -------------------------------------------------------------------
+  // A batch inserts one queued evaluate run per eligible job under one group, then starts at most
+  // `batchConcurrency` of them; the rest wait in this in-memory table and start as earlier ones
+  // exit. Rows waiting here are exempt from the stale-queued reconcile; after a server restart the
+  // table is empty, so those rows are settled as QUEUE_STALE like any orphaned queued row.
+  const batchGroups = new Map(); // groupId -> { waiting: run[], active: number }
+  const waitingIds = new Set();
+  const launchingIds = new Set();
+
+  // Company slug per waiting or live batch run. evaluate-jobs.mjs researches a company into one
+  // cache file and fails if it changes mid-run, so two runs for one company never overlap: a
+  // waiting run starts only when no live batch run (in any group) has its company. An unknown
+  // company (empty slug) never blocks.
+  const runCompanies = new Map();
+  const liveCompanies = new Map(); // slug -> number of launched, not yet exited runs
+
+  // Counts a launched single evaluate against its company until it exits (`launch` option).
+  function holdCompany(job) {
+    const company = typeof job?.company === 'string' ? companySlug(job.company) : '';
+    if (!company) return {};
+    liveCompanies.set(company, (liveCompanies.get(company) ?? 0) + 1);
+    return {
+      onDone: () => {
+        const left = (liveCompanies.get(company) ?? 1) - 1;
+        if (left > 0) liveCompanies.set(company, left);
+        else liveCompanies.delete(company);
+        for (const id of [...batchGroups.keys()]) pumpGroup(id);
+      },
+    };
+  }
+
+  function pumpGroup(groupId) {
+    const group = batchGroups.get(groupId);
+    if (!group) return [];
+    const started = [];
+    while (group.active < batchConcurrency) {
+      const index = group.waiting.findIndex(run => {
+        const company = runCompanies.get(run.id) ?? '';
+        return !company || !liveCompanies.get(company);
+      });
+      if (index < 0) break;
+      const [run] = group.waiting.splice(index, 1);
+      const company = runCompanies.get(run.id) ?? '';
+      waitingIds.delete(run.id);
+      launchingIds.add(run.id);
+      group.active += 1;
+      if (company) liveCompanies.set(company, (liveCompanies.get(company) ?? 0) + 1);
+      started.push(
+        launch(run, {
+          onDone: () => {
+            launchingIds.delete(run.id);
+            runCompanies.delete(run.id);
+            group.active -= 1;
+            if (company) {
+              const left = (liveCompanies.get(company) ?? 1) - 1;
+              if (left > 0) liveCompanies.set(company, left);
+              else liveCompanies.delete(company);
+            }
+            if (!group.waiting.length && group.active === 0) batchGroups.delete(groupId);
+            // A freed company can unblock a run in any group.
+            for (const id of [...batchGroups.keys()]) pumpGroup(id);
+          },
+        }).catch(error => {
+          onError(error);
+          return run;
+        }),
+      );
+    }
+    return started;
+  }
+
+  function validateBatch(input) {
+    if (!input || typeof input !== 'object' || Array.isArray(input))
+      throw invalid('body', 'Request body must be a JSON object.');
+    for (const key of Object.keys(input))
+      if (!['requestKey', 'jobIds', 'next'].includes(key)) throw invalid(key);
+    if (typeof input.requestKey !== 'string' || !KEY_PATTERN.test(input.requestKey))
+      throw invalid('requestKey');
+    if ((input.jobIds === undefined) === (input.next === undefined))
+      throw invalid('jobIds', 'Send exactly one of jobIds or next.');
+    if (input.jobIds !== undefined) {
+      const ids = input.jobIds;
+      if (
+        !Array.isArray(ids) ||
+        ids.length < 1 ||
+        ids.length > BATCH_MAX ||
+        ids.some(id => typeof id !== 'string' || !ID_PATTERN.test(id)) ||
+        new Set(ids).size !== ids.length
+      )
+        throw invalid('jobIds');
+      return { requestKey: input.requestKey, jobIds: [...ids] };
+    }
+    if (!Number.isInteger(input.next) || input.next < 1 || input.next > BATCH_MAX)
+      throw invalid('next');
+    return { requestKey: input.requestKey, next: input.next };
+  }
+
+  // Same order as `node src/eval/next-jobs.mjs --json N` (Pending, ascending id, first N).
+  async function nextPending(count) {
+    if (pendingJobIds) return pendingJobIds(count);
+    const rows = await query(
+      "SELECT id::text AS id FROM jobs WHERE status='Pending' ORDER BY id LIMIT $1",
+      [count],
+    );
+    return (Array.isArray(rows) ? rows : (rows?.rows ?? [])).map(row => String(row.id));
+  }
+
+  async function dispatchEvaluateBatch(input) {
+    const validated = validateBatch(input);
+    const { requestKey } = validated;
+    return serialized(() =>
+      guarded(async () => {
+        // The first run carries the batch key itself, so a replay finds the group through it.
+        const first = await runs.getByRequestKey(requestKey);
+        if (first) {
+          if (first.action !== 'evaluate' || !first.groupId)
+            throw mapFailure(new RunsStoreError('REQUEST_KEY_CONFLICT', 'conflict'));
+          const members = await runs.listByGroup(first.groupId);
+          return {
+            groupId: first.groupId,
+            runs: members.map(toWireRun),
+            skipped: [],
+            replayed: true,
+          };
+        }
+        const candidates = validated.jobIds ?? (await nextPending(validated.next));
+        const skipped = [];
+        const eligible = [];
+        const companyOf = new Map();
+        for (const jobId of candidates) {
+          try {
+            const job = await lookupJob(jobId);
+            if (!job) {
+              skipped.push({ jobId, reason: 'Job not found.' });
+              continue;
+            }
+            await checkPrerequisites(jobId, 'evaluate', ['evaluate']);
+            eligible.push(jobId);
+            companyOf.set(jobId, typeof job.company === 'string' ? companySlug(job.company) : '');
+          } catch (error) {
+            const mapped = mapFailure(error);
+            if (mapped instanceof DatabaseUnavailableError || mapped instanceof SchemaNotReadyError)
+              throw mapped;
+            skipped.push({ jobId, reason: mapped.message });
+          }
+        }
+        if (!eligible.length)
+          throw publicError(
+            409,
+            'NO_ELIGIBLE_JOBS',
+            'No job in this request can be evaluated.',
+            undefined,
+            false,
+            { skipped },
+          );
+        const selection = { ...(resolveSelection ? await resolveSelection('evaluate') : {}) };
+        await ensureProviders([selection]);
+        const groupId = randomUUID();
+        const inserted = [];
+        for (const [index, jobId] of eligible.entries()) {
+          const stamp = now()
+            .toISOString()
+            .replace(/[-:]/g, '')
+            .replace(/\..*$/, '')
+            .replace('T', '-');
+          inserted.push(
+            await runs.insert({
+              requestKey: index === 0 ? requestKey : `${requestKey}:${jobId}`,
+              groupId,
+              action: 'evaluate',
+              jobId,
+              logRef: `evaluate-${jobId}-${stamp}-${randomBytes(4).toString('hex')}.log`,
+              selection,
+            }),
+          );
+        }
+        batchGroups.set(groupId, { waiting: [...inserted], active: 0 });
+        for (const run of inserted) {
+          waitingIds.add(run.id);
+          runCompanies.set(run.id, companyOf.get(run.jobId) ?? '');
+        }
+        const started = new Map();
+        for (const run of await Promise.all(pumpGroup(groupId))) started.set(run.id, run);
+        return {
+          groupId,
+          runs: inserted.map(run => toWireRun(started.get(run.id) ?? run)),
+          skipped,
+          replayed: false,
+        };
+      }),
+    );
+  }
+
+  // Interrupts the group's runs that never started. Running runs are left alone. Rows waiting in
+  // this process are removed from the queue; queued rows nothing here will start (orphans of an
+  // earlier server) are settled too. A run already being launched is not touched.
+  async function cancelQueued(groupId) {
+    if (typeof groupId !== 'string' || !UUID_PATTERN.test(groupId)) throw invalid('groupId');
+    return guarded(async () => {
+      const members = await runs.listByGroup(groupId);
+      if (!members.length) throw notFound();
+      const group = batchGroups.get(groupId);
+      if (group) {
+        for (const run of group.waiting) {
+          waitingIds.delete(run.id);
+          runCompanies.delete(run.id);
+        }
+        group.waiting = [];
+        if (group.active === 0) batchGroups.delete(groupId);
+      }
+      let cancelled = 0;
+      for (const run of members) {
+        if (run.state !== 'queued' || launchingIds.has(run.id)) continue;
+        const settled = await runs.finish(run.id, 'interrupted', null, 'CANCELLED');
+        if (settled.state === 'interrupted' && settled.errorCode === 'CANCELLED') cancelled += 1;
+      }
+      return { groupId, cancelled };
+    });
   }
 
   // `limit` is the number of terminal rows (default 12, 1 to 50); active rows are always listed.
@@ -1061,6 +1395,7 @@ export function createRunsService({
       // A queued row that never started (a crash between insert and start, or a failed start
       // call) will not progress by itself: after a few minutes it is interrupted.
       for (const run of active.filter(row => row.state === 'queued')) {
+        if (waitingIds.has(run.id)) continue; // waiting its turn in a live batch
         if (now().getTime() - new Date(run.createdAt).getTime() > QUEUED_STALE_MS)
           settled.push(await runs.finish(run.id, 'interrupted', null, 'QUEUE_STALE'));
       }
@@ -1121,6 +1456,8 @@ export function createRunsService({
 
   return Object.freeze({
     dispatch,
+    dispatchEvaluateBatch,
+    cancelQueued,
     list,
     get,
     log,

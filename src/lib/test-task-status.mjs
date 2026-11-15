@@ -51,6 +51,34 @@ try {
   assert.equal(saved.exit_code, 1);
   assert.equal(saved.number, 1152, 'the record keeps identifying its job after a crash');
 
+  // An expected non-zero outcome: the record carries its code, the state stays failed.
+  writeFileSync(record, JSON.stringify({ action: 'evaluate', number: 9, state: 'running' }));
+  const worker = body => {
+    writeFileSync(record, JSON.stringify({ action: 'evaluate', number: 9, state: 'running' }));
+    return run(
+      'import { setRunOutcome } from ' +
+        JSON.stringify(pathToFileURL(join(here, '_task-status.mjs')).href) +
+        ';\n' +
+        body,
+      2,
+    );
+  };
+  saved = worker("setRunOutcome('LOCATION_REVIEW');\nprocess.exitCode = 2;\n");
+  assert.equal(saved.state, 'failed');
+  assert.equal(saved.exit_code, 2);
+  assert.equal(saved.error_code, 'LOCATION_REVIEW');
+  saved = worker('process.exitCode = 2;\n');
+  assert.equal(saved.error_code, undefined, 'without an outcome the code is the generic one');
+  saved = worker("setRunOutcome('bad code');\nprocess.exitCode = 2;\n");
+  assert.equal(saved.error_code, undefined, 'a malformed code is ignored');
+  const { terminalErrorCode, setRunOutcome } = await import('./_task-status.mjs');
+  assert.equal(terminalErrorCode(0), null);
+  assert.equal(terminalErrorCode(2), 'EXIT_NONZERO');
+  setRunOutcome('LOCATION_REVIEW');
+  assert.equal(terminalErrorCode(2), 'LOCATION_REVIEW', 'the beforeExit hook reports this code');
+  assert.equal(terminalErrorCode(0), null, 'a clean exit never carries an outcome code');
+  setRunOutcome(null);
+
   // Run-aware path: calls go through the injected query, are bounded, and never throw.
   const { createRunReporter } = await import('./_task-status.mjs');
   const runId = '11111111-2222-4333-8444-555555555555';

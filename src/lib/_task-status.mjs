@@ -14,6 +14,19 @@ const file = process.env.CAREER_TASK_FILE || '';
 const runId = process.env.CAREER_RUN_ID || '';
 const RUN_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 let installed = false;
+let outcomeCode = null;
+
+// A launcher whose non-zero exit is an expected outcome (for example a job that needs a location
+// decision) names it here; the terminal report then carries this code instead of EXIT_NONZERO.
+// The state stays `failed` and the exit code is unchanged. Ignored on exit code 0.
+export function setRunOutcome(errorCode) {
+  outcomeCode =
+    typeof errorCode === 'string' && /^[A-Z][A-Z0-9_]{1,39}$/.test(errorCode) ? errorCode : null;
+}
+
+export function terminalErrorCode(exitCode) {
+  return exitCode === 0 ? null : (outcomeCode ?? 'EXIT_NONZERO');
+}
 
 // Run-aware path. A task started from the browser dashboard also carries CAREER_RUN_ID; its
 // progress and outcome are then mirrored into browser_runs through the existing pool. Every call
@@ -112,13 +125,14 @@ export function install() {
     await runReporter.finish(
       exitCode === 0 ? 'completed' : 'failed',
       exitCode,
-      exitCode === 0 ? null : 'EXIT_NONZERO',
+      terminalErrorCode(exitCode),
     );
   });
   process.on('exit', code => {
     save({
       state: code === 0 ? 'completed' : 'failed',
       exit_code: code,
+      ...(code !== 0 && outcomeCode ? { error_code: outcomeCode } : {}),
       finished_at: new Date().toISOString(),
     });
   });

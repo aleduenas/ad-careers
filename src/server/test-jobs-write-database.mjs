@@ -401,9 +401,46 @@ try {
   assert.equal(await down.runOnce(), null);
   assert.equal(logs.at(-1), 'Ghosting: skipped (database not ready).');
 
+  // D114 favorite: a label only. Revision, status, score and status favEvents never change.
+  const fav = await newJob('Acme', 'Favorite', 'https://example.test/favorite');
+  const favId = String(fav.id);
+  const favEvents = async () =>
+    (await rows('SELECT count(*)::int AS n FROM job_status_events WHERE job_id=$1', [favId]))[0].n;
+  const favSnapshot = async () =>
+    JSON.stringify(
+      (await rows('SELECT status, score, revision::text FROM jobs WHERE id=$1', [favId]))[0],
+    );
+  assert.equal((await detail.detail(favId)).job.favorite, false, 'default is not a favorite');
+  const favEventsBefore = await favEvents();
+  const favStateBefore = await favSnapshot();
+  assert.deepEqual(await writer.setFavorite(favId, { favorite: true }), {
+    id: favId,
+    favorite: true,
+  });
+  assert.deepEqual(await writer.setFavorite(favId, { favorite: true }), {
+    id: favId,
+    favorite: true,
+  });
+  assert.equal((await detail.detail(favId)).job.favorite, true);
+  assert.equal(await favSnapshot(), favStateBefore, 'status, score and revision are unchanged');
+  assert.equal(await favEvents(), favEventsBefore, 'no status event is written');
+  const favStatus = await writer.changeStatus(favId, {
+    expectedRevision: String(fav.revision),
+    status: 'Evaluated',
+    reason: '',
+  });
+  assert.equal(favStatus.job.favorite, true, 'a status change keeps the flag');
+  assert.deepEqual(await writer.setFavorite(favId, { favorite: false }), {
+    id: favId,
+    favorite: false,
+  });
+  await reject(writer.setFavorite('987654321', { favorite: true }), error =>
+    assert.equal(error.statusCode, 404),
+  );
+
   assert.equal(await otherTables(), untouched, 'no evaluation, claim or run row was touched');
   console.log(
-    'PostgreSQL job writes passed: every status transition and discard rule, revision and field conflicts, URL uniqueness and url_key, salary clear, JD revision/hash progression and cache file, ghosting boundary',
+    'PostgreSQL job writes passed: every status transition and discard rule, revision and field conflicts, URL uniqueness and url_key, salary clear, favorite flag as a pure label, JD revision/hash progression and cache file, ghosting boundary',
   );
 } finally {
   await pool?.end().catch(() => {});

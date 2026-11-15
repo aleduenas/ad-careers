@@ -1,0 +1,116 @@
+/* The tasks page. */
+
+/* Package 3.6: Tasks page and navigation count. */
+.tasks-page {
+  display: grid;
+  gap: 14px;
+}
+
+.tasks-table {
+  width: 100%;
+  min-width: 960px;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 12px;
+}
+
+.tasks-table th,
+.tasks-table td {
+  padding: 9px 11px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: top;
+}
+
+.tasks-table thead th {
+  background: var(--paper-soft);
+  color: var(--muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.tasks-table tbody th {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.task-toggle {
+  min-height: 32px;
+  padding: 4px 9px;
+}
+
+.tui-badge {
+  display: inline-block;
+  margin-left: 7px;
+  padding: 1px 7px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--paper-soft);
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.run-detail-row > td {
+  background: var(--paper-soft);
+}
+
+.run-detail {
+  display: grid;
+  gap: 12px;
+  max-width: 100%;
+}
+
+.run-detail .notice {
+  margin: 0;
+}
+
+.log-follow {
+  display: grid;
+  gap: 8px;
+}
+
+.log-follow-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.chevron-button {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  margin-right: 6px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.task-action {
+  font-weight: 600;
+}
+
+.run-code {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 1100px) {
+  .task-extra-error {
+    color: var(--red);
+  }
+
+  .tasks-table {
+    min-width: 0;
+  }
+
+  .tasks-table tbody th {
+    white-space: normal;
+  }
+}

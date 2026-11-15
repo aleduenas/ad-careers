@@ -14,6 +14,9 @@ import {
   validModel,
 } from './providers.mjs';
 
+// Test guard: a test never reaches the configured database (see src/lib/_database.mjs).
+process.env.CAREER_OPS_TEST_GUARD = '1';
+
 const sha = text => createHash('sha256').update(text).digest('hex');
 
 async function withRoot(callback, files = {}) {

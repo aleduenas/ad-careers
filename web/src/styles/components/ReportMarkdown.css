@@ -1,0 +1,120 @@
+/* The ReportMarkdown component. */
+
+.report-prose {
+  max-height: 70vh;
+  overflow: auto;
+  font-size: 14px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.report-prose .rp-h1 {
+  font-size: 20px;
+}
+
+.report-prose .rp-h2 {
+  padding-bottom: 4px;
+  border-bottom: 1px solid var(--line);
+  font-size: 17px;
+}
+
+.report-prose .rp-h3,
+.report-prose .rp-h4 {
+  font-size: 15px;
+}
+
+.report-prose ul,
+.report-prose ol {
+  padding-left: 22px;
+}
+
+.report-prose blockquote {
+  padding: 2px 14px;
+  border-left: 3px solid var(--line);
+  color: var(--muted);
+}
+
+.report-prose code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--paper-soft);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 12.5px;
+}
+
+.report-prose pre {
+  padding: 10px 12px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-soft);
+}
+
+.report-prose pre code {
+  padding: 0;
+  background: none;
+}
+
+.report-prose hr {
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.report-table-scroll {
+  margin: 0 0 0.8em;
+  overflow-x: auto;
+}
+
+.report-prose table {
+  min-width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.report-prose th,
+.report-prose td {
+  min-width: 7em;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  overflow-wrap: break-word;
+  text-align: left;
+  vertical-align: top;
+}
+
+/* F37: label cells (first column) never break inside a word and keep a readable width. */
+.report-prose th:first-child,
+.report-prose td:first-child {
+  min-width: 9em;
+  overflow-wrap: normal;
+  word-break: normal;
+  hyphens: none;
+}
+
+.report-prose th {
+  background: var(--paper-soft);
+}
+
+/* Package 4.3 F22 to F24: report header grid, wide tables, panes without bubbles. */
+.report-fields {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 20px;
+  margin: 0 0 1.2em;
+}
+
+.report-prose table {
+  width: 100%;
+}
+
+.report-prose th {
+  white-space: nowrap;
+}
+
+.report-prose td:not(:first-child):not(:last-child) {
+  min-width: 5.5ch;
+  white-space: nowrap;
+}
+
+.report-prose td:last-child:not(:first-child) {
+  min-width: 28ch;
+}

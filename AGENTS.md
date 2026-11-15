@@ -3,7 +3,8 @@
 This file is read by AI coding sessions (Claude Code, Codex and similar) that work **on** this
 repository. It contains no career context on purpose: the LLM workers that do the project's
 actual work (evaluating jobs, drafting CVs) read `llm/`, never this file, and this file never
-needs to know who the candidate is. See `documentation/guides/layout.md`, rule 8.
+needs to know who the candidate is. Development-session and worker instructions never mix:
+`AGENTS.md` and `.claude/` carry no career context, and `llm/` carries no maintenance instructions.
 
 ## What this repository is
 
@@ -11,8 +12,9 @@ A dashboard-first job-search backend. The browser dashboard (`web/`, served by t
 in `src/server/`) is the product; it runs deterministic Node launchers under `src/` (scan portals,
 ingest a pasted JD, evaluate a job, draft a CV or cover letter, publish a PDF). Launchers make
 isolated subscription-CLI calls with versioned prompts from `llm/prompts/`. PostgreSQL (`infra/`) is
-the only operational store. Layout, rules and "what moved where" are in
-`documentation/guides/layout.md`; start every task by reading `documentation/index.md`.
+the only operational store. The documentation is one concise README at the top of each root folder
+(`src/`, `infra/`, `llm/`, `config/`, `web/`) plus the root `README.md`; start every task by reading the
+README of the folder you will change.
 
 There is no conversational workflow layer any more: the former `modes/` and skill routers were
 retired on 2026-09-19 (archive under `data/archive/modes-retired-2026/`). A session's job here is
@@ -25,13 +27,13 @@ code maintenance, running documented commands, and keeping documentation in step
    functions (`src/helpers/move-status.mjs`, the dashboard) and check the expected revision.
    Database unavailability is an error, not a reason to improvise. Statuses are exactly the labels
    in the `jobs.status` CHECK constraint (`infra/sql/schema.sql`; readable list in
-   `documentation/guides/database.md`).
+   `infra/README.md`).
 2. **Migrations are immutable.** Schema or data changes are new numbered files in
    `infra/sql/migrations/`; regenerate `infra/sql/schema.sql` with `node src/helpers/db-schema.mjs`.
    Never edit an applied migration.
 3. **Private data stays private.** `config/` (except README and `examples/`), `llm/compacted/`,
    `data/`, `output/`, `logs/` are gitignored candidate material or work product. Never commit them,
-   never quote candidate facts into `src/`, `llm/prompts/`, `web/`, `documentation/` or this
+   never quote candidate facts into `src/`, `llm/prompts/`, `web/`, any README or this
    file. Facts enter prompts only at run time from `config/` and `llm/compacted/`.
 4. **Never sync from any upstream remote.** This copy diverged permanently; there is no update
    mechanism.
@@ -46,10 +48,12 @@ code maintenance, running documented commands, and keeping documentation in step
 8. **Tests and builds.** `node src/test-all.mjs --quick` before reporting done (`npm test` runs the
    full suite including the web production build). Isolated database integration: `node
    src/helpers/db-test.mjs` (never against the personal database).
-9. **Documentation is part of the change.** Every source file has a page under
-   `documentation/<same path>.md`; adding or moving a file means adding or moving its page.
-   Launcher and prompt are a pair: a placeholder or response key renamed in one is renamed in the
-   other and on both pages.
+9. **Documentation is one concise README per root folder, updated in the same change.** There are no
+   per-file pages. Say what is not obvious from the code and drop what restates it: no history, no
+   decisions log, no inventory of files. A change that alters a command, an API route, a table, a prompt
+   placeholder or a rule updates the README of its folder; `src/test-all.mjs` checks that each root
+   folder has one. Launcher and prompt are a pair: a placeholder or response key renamed in one is
+   renamed in the other.
 10. **Shell policy.** Prefer the documented scripts over ad hoc shell or SQL. Anything that mutates
     data runs in dry-run mode first (`prune-logs`, `sync-jds`, `import-legacy` all default to
     read-only).
@@ -58,14 +62,12 @@ code maintenance, running documented commands, and keeping documentation in step
 
 | Need | Go to |
 |---|---|
-| Folder structure and rules | `documentation/guides/layout.md` |
-| Every CLI command | `documentation/guides/SCRIPTS.md` |
-| Evaluation runbook | `documentation/guides/EVALUATION_CLI.md`; rubric authority `llm/prompts/eval/scoring.md`; rationale `documentation/guides/scoring-rubric.md` |
-| CV / letter drafting | `documentation/guides/CV_DRAFTING.md` |
-| Database, statuses, backup/restore, legacy recovery | `documentation/guides/database.md` |
-| Private vs system files | `documentation/guides/DATA_CONTRACT.md` |
-| Per-file reference | `documentation/src/`, `documentation/llm/`, `documentation/infra/`, `documentation/web/`, `documentation/config/` |
-| Cleanup history and decisions | `documentation/history/` |
+| Launchers, every CLI command, evaluation and drafting runbooks, server API, tests | `src/README.md` |
+| Database, statuses, migrations, backup and restore, isolated test database, CI | `infra/README.md` |
+| Prompts, the launcher and prompt contract, the scoring rubric (authority `llm/prompts/eval/scoring.md`) | `llm/README.md` |
+| Private settings, candidate documents, readiness per action, private versus system files | `config/README.md` |
+| Browser dashboard source and rules | `web/README.md` |
+| Project overview, setup | `README.md` |
 
 ## hiring.cafe provider contract (mandatory)
 

@@ -21,13 +21,14 @@ not done until you are satisfied. You did not build what you review, and you do 
 4. **Rules:** `AGENTS.md` hard rules; PostgreSQL authority; no fallback store; no score gating;
    no incidental drafting or PDF; no application submission; no private data in source, fixtures
    or responses; loopback and Host/Origin checks intact; JD and report text rendered as text.
-5. **Regressions and docs:** nothing that worked broke; every changed file has its mirrored page.
+5. **Regressions and docs:** nothing that worked broke; documentation follows `AGENTS.md` rule 9
+   (folder README true and concise; no new per-file pages).
 
 ## How to report
 
 - Real problems only, each with file and line, the failure it causes, and a severity.
 - One verdict: `Pass` or `Needs fixes`. Save the report as
-  `documentation/dashboard-migration/reviews/<package>.md`, short enough to read in a minute.
+  `notes/dashboard-migration/reviews/<package>.md`, short enough to read in a minute.
 - Tell the lead the verdict. On Needs fixes, the owner fixes and you recheck only the delta.
 - Do not request hash matching, repeated full suites for unchanged code, or extra evidence rituals.
   State plainly what you could not test.

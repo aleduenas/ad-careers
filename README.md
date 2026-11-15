@@ -1,30 +1,29 @@
 # career-ops
 
 A local, dashboard-first job-search backend: scan employer portals, keep every posting and its
-status in PostgreSQL, evaluate roles against a candidate profile with an isolated LLM worker,
-and draft tailored CVs and cover letters as PDFs. Everything runs on your machine; the LLM calls
-use your own Claude or ChatGPT subscription login, never API keys.
+status in PostgreSQL, evaluate roles against a candidate profile with an isolated LLM worker, and
+draft tailored CVs and cover letters as PDFs. Everything runs on your machine; the LLM calls use your
+own Claude or ChatGPT subscription login, never API keys.
 
-Full documentation lives in [`documentation/`](documentation/index.md). The folder structure and
-the rules the code follows are in
-[`documentation/guides/layout.md`](documentation/guides/layout.md).
+## Map
 
-## What it does
+Each folder has one concise README, and that is all the documentation; there are no per-file pages.
 
-| Action (dashboard) | Backend | Result |
-|---|---|---|
-| Scan | `src/scan/scan.mjs` + `src/scan/providers/` | New postings with full job descriptions, deduplicated, stored in PostgreSQL and cached under `data/jds/` |
-| Paste a JD | `src/scan/add-pasted-jd.mjs` | A job created from a posting you paste, JD kept verbatim |
-| Evaluate | `src/eval/evaluate-jobs.mjs` | Location gate, cached company/market research, an 8-dimension scored report in `data/evaluations/` |
-| CV | `src/cvgen/draft-cv.mjs` | A rendered CV PDF in `output/<company>/<role>--<job-id>/` |
-| Cover letter | `src/cvgen/draft-cover-letter.mjs` | An editable `cover-letter.md` in the same folder, drafted by its own call |
-| CV + cover letter | both of the above | Two separate background tasks, never one combined call |
-| Publish letter | `src/cvgen/publish-cover-letter.mjs` | The edited letter as a PDF |
-| Status changes, viewing | Browser dashboard (`web/`) | Revision-checked status transitions; reports, CVs, letters and interview prep opened from the pipeline |
+| Folder | README covers |
+|---|---|
+| [`src/`](src/README.md) | Launchers and every command, the evaluation and drafting runbooks, the server API, tests, the rules maintainers must keep |
+| [`infra/`](infra/README.md) | PostgreSQL, statuses, migrations, backup and restore, the isolated test database, CI |
+| [`llm/`](llm/README.md) | Prompts, the launcher and prompt contract, the scoring rubric, compact candidate inputs |
+| [`config/`](config/README.md) | Private settings and candidate documents, what each action needs, the private-versus-system data contract |
+| [`web/`](web/README.md) | The React dashboard: module map and rules |
+| `.github/workflows/` | `test.yml` runs the quick suite on pull requests; `database.yml` runs schema check, `db-test` and the PDF render test on every push |
+
+`AGENTS.md` (and `CLAUDE.md`) are the rules for AI sessions that work on this repository.
+`data/`, `output/` and `logs/` hold private work product and run evidence; see `config/README.md`.
 
 ## Requirements
 
-- Windows 11 (the dashboard launcher and Docker setup script target Windows; the Node code is portable)
+- Windows 11 (the service launcher and Docker setup script target Windows; the Node code is portable)
 - Node.js 24, Docker Desktop
 - A Claude Code (`claude`) and/or Codex (`codex`) CLI with a subscription login
 
@@ -33,54 +32,35 @@ the rules the code follows are in
 ```bash
 npm install
 npx playwright install chromium          # PDF rendering and browser fallbacks
-node src/helpers/db-infra.mjs init       # creates private .env with a random password
+node src/helpers/db-infra.mjs init       # creates the private .env with a random password
 npm run db:up                            # PostgreSQL via Docker Compose
 npm run db:migrate                       # applies infra/sql/migrations/
 cp config/examples/profile.example.yml config/profile.yml
 cp config/examples/portals.example.yml config/portals.yml
 # then write config/cv.md, config/profile.md and the compact twins under llm/compacted/
-npm run web:start                        # the browser dashboard at http://localhost:4310
+npm run web:build
+npm run web:start                        # the dashboard at http://localhost:4310
 ```
 
-### Browser dashboard (always on)
+Check the setup with `node src/test-all.mjs --quick`, `node src/helpers/verify-portals.mjs`,
+`node src/cvgen/draft-cv.mjs --doctor` and `node src/eval/evaluate-jobs.mjs --doctor`.
+`config/README.md` lists which private files each dashboard action needs.
 
-Run `npm run web:install` once. The dashboard then starts at every Windows logon, with no
-administrator rights and no window, and comes back within a minute if it crashes. Bookmark
-`http://localhost:4310`. After `npm run web:build`, run `npm run web:restart` to serve the new
-build. `npm run web:status` shows what is running; `npm run web:down` and `npm run web:uninstall`
-stop it and remove the logon entry. If PostgreSQL is not up yet at logon, the service waits for it
-(up to five minutes). Log: `logs/dashboard/server.log`.
-
-The step-by-step version, including which private files must exist before each action works, is
-[`documentation/guides/SETUP.md`](documentation/guides/SETUP.md).
-
-## Layout
-
-```
-src/            backend: lib/ helpers/ cvgen/ eval/ scan/ analytics/ test-all.mjs
-llm/            prompts the LLM workers read; compacted/ (private) token-cheap candidate inputs
-infra/          sql/ migrations + schema snapshot; docker/ compose and setup
-web/            browser dashboard (React/Vite); src/server/ is its local API
-config/         (private) candidate documents and runtime settings; examples/ tracked
-data/           (private) jds/ evaluations/ company-info/ interview-prep/ writing-samples/ archive/ backups/
-output/         (private) generated CVs and letters per company/role
-logs/           (private) run evidence
-documentation/  index, guides, one page per source file, history
-```
+For an always-on dashboard run `npm run web:install` once: it starts at every Windows logon with no
+administrator rights and no window, restarts within a minute if it crashes, and waits up to five
+minutes for PostgreSQL. After `npm run web:build`, run `npm run web:restart`. `web:status`, `web:down`
+and `web:uninstall` do what they say; the log is `logs/dashboard/server.log`.
 
 ## Everyday commands
 
 ```bash
-npm test                                 # full suite incl. web build; --quick via node src/test-all.mjs --quick
-node src/helpers/db-test.mjs             # isolated PostgreSQL + launcher integration tests
-npm run db:backup                        # custom-format dump into data/backups/
-node src/helpers/verify-pipeline.mjs     # every stored report/JD path resolves
-node src/helpers/prune-logs.mjs          # retention policy, dry-run by default
+node src/test-all.mjs --quick            # before reporting any change done; npm test adds the web build
+node src/helpers/db-test.mjs             # isolated PostgreSQL integration tests
+npm run db:backup                        # dump into data/backups/
+node src/helpers/prune-logs.mjs          # retention policy, dry run by default
 ```
-
-Every command is listed in [`documentation/guides/SCRIPTS.md`](documentation/guides/SCRIPTS.md).
 
 ## Privacy
 
-`config/`, `llm/compacted/`, `data/`, `output/` and `logs/` are gitignored. Nothing about the
-candidate is committed; the repository holds code, prompts and documentation only.
+`config/`, `llm/compacted/`, `data/`, `output/` and `logs/` are gitignored. Nothing about the candidate
+is committed; the repository holds code, prompts and READMEs only.

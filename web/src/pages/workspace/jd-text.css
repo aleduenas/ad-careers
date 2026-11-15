@@ -1,0 +1,20 @@
+/* The Formatted / Raw text switch above the job description. */
+
+.jd-view-switch {
+  display: inline-flex;
+  gap: 4px;
+  margin: 0 0 8px;
+}
+
+.jd-view-switch button {
+  min-height: 30px;
+  padding: 3px 10px;
+  font-size: 12px;
+}
+
+.jd-view-switch button[aria-pressed='true'] {
+  border-color: var(--green);
+  background: var(--green-bg);
+  color: var(--green);
+  font-weight: 700;
+}

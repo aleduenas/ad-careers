@@ -9,8 +9,13 @@ import type {
   IntakePreviewResponse,
   IntakeSubmitRequest,
   JobDetailResponse,
+  JobFavoriteRequest,
+  JobFavoriteResponse,
   ProvidersPutRequest,
   ProvidersSettingsResponse,
+  RunBatchRequest,
+  RunBatchResponse,
+  RunCancelQueuedResponse,
   RunCreateRequest,
   ScanReportResponse,
   RunCreateResponse,
@@ -25,6 +30,7 @@ import type {
   LetterResponse,
   JobWriteResponse,
   JobsQuery,
+  LivenessSummaryResponse,
   JobsResponse,
   OverviewResponse,
   ReadyResponse,
@@ -83,6 +89,11 @@ export type JobRunRequest = Extract<
 >;
 export type RunSelection = NonNullable<JobRunRequest['selection']>;
 
+export type BatchRequest = RunBatchRequest;
+export type BatchResult = RunBatchResponse['data'];
+export type BatchSkip = BatchResult['skipped'][number];
+export type LivenessSummary = LivenessSummaryResponse['data'];
+export type LivenessRunRequest = Extract<RunCreateRequest, { action: 'liveness' }>;
 export type RunRecord = RunResponse['data']['run'];
 export const discoveryCodes = ['DISCOVERY_BUSY', 'DUPLICATE_JOB', 'SEEN_URL'] as const;
 
@@ -157,7 +168,35 @@ const filters = [
   'offer',
   'any',
 ];
-const sortKeys = ['score', 'statusDate', 'addedDate', 'company'];
+const sortKeys = ['score', 'statusDate', 'addedDate', 'company', 'favorite', 'yoe'];
+const postingStates = ['open', 'closed', 'probably_closed', 'unknown'];
+const postingActions = ['none', 'flagged', 'discarded', 'held_back'];
+
+/** The latest posting check on a job: null when never checked; detail rows add method and detail. */
+function isPosting(value: unknown, detail = false): boolean {
+  if (value === null) return true;
+  return (
+    isRecord(value) &&
+    postingStates.includes(value.state as string) &&
+    postingActions.includes(value.action as string) &&
+    typeof value.checkedAt === 'string' &&
+    (!detail || (typeof value.method === 'string' && typeof value.detail === 'string'))
+  );
+}
+
+function isYoeFields(item: Record<string, unknown>): boolean {
+  return (
+    (item.yoeMin === undefined ||
+      item.yoeMin === null ||
+      (Number.isInteger(item.yoeMin) &&
+        (item.yoeMin as number) >= 0 &&
+        (item.yoeMin as number) <= 40)) &&
+    (item.yoeConfidence === undefined ||
+      item.yoeConfidence === null ||
+      ['high', 'medium', 'low', 'inferred'].includes(item.yoeConfidence as string)) &&
+    (item.posting === undefined || isPosting(item.posting))
+  );
+}
 
 function hasString(value: unknown): value is string {
   return typeof value === 'string';
@@ -202,7 +241,14 @@ function isJobsQuery(value: unknown): value is JobsQuery {
     (value.limit as number) <= 200 &&
     (value.scoreMin === undefined || Number.isFinite(value.scoreMin)) &&
     (value.scoreMax === undefined || Number.isFinite(value.scoreMax)) &&
-    (value.addedWeek === undefined || hasString(value.addedWeek))
+    (value.addedWeek === undefined || hasString(value.addedWeek)) &&
+    (value.favorite === undefined || value.favorite === true) &&
+    (value.yoeMax === undefined ||
+      (Number.isInteger(value.yoeMax) &&
+        (value.yoeMax as number) >= 0 &&
+        (value.yoeMax as number) <= 40)) &&
+    (value.yoeUnknown === undefined || value.yoeUnknown === 'exclude') &&
+    (value.posting === undefined || ['expired', 'applied-closed'].includes(value.posting as string))
   );
 }
 
@@ -241,7 +287,8 @@ function isJobItem(item: unknown): boolean {
       item.compensation.state as string,
     ) ||
     typeof item.materials.cv !== 'boolean' ||
-    typeof item.materials.letter !== 'boolean'
+    typeof item.materials.letter !== 'boolean' ||
+    !isYoeFields(item)
   )
     return false;
   return true;
@@ -269,10 +316,11 @@ function isNullableText(value: unknown): value is string | null {
 function isDetailJob(job: unknown): boolean {
   if (!isRecord(job) || typeof job.notes !== 'string' || typeof job.evaluationError !== 'boolean')
     return false;
-  const { notes: _notes, evaluationError: _error, ...item } = job;
+  const { notes: _notes, evaluationError: _error, posting, ...item } = job;
   void _notes;
   void _error;
-  return isJobItem(item);
+  // The detail view's posting check also carries the method and a sentence of detail.
+  return (posting === undefined || isPosting(posting, true)) && isJobItem(item);
 }
 
 function isJdRecord(jd: unknown): boolean {
@@ -658,6 +706,48 @@ function isRunCreateResponse(value: unknown): value is RunCreateResponse {
   );
 }
 
+function isBatchResponse(value: unknown): value is RunBatchResponse {
+  const data = isRecord(value) ? value.data : undefined;
+  return (
+    isRecord(data) &&
+    typeof data.groupId === 'string' &&
+    Array.isArray(data.runs) &&
+    data.runs.length >= 1 &&
+    data.runs.every(isRunRecord) &&
+    Array.isArray(data.skipped) &&
+    data.skipped.every(
+      item => isRecord(item) && typeof item.jobId === 'string' && typeof item.reason === 'string',
+    ) &&
+    typeof data.replayed === 'boolean'
+  );
+}
+
+function isCancelQueuedResponse(value: unknown): value is RunCancelQueuedResponse {
+  const data = isRecord(value) ? value.data : undefined;
+  return isRecord(data) && typeof data.groupId === 'string' && hasCount(data.cancelled);
+}
+
+function isLivenessSummary(value: unknown): value is LivenessSummaryResponse {
+  const data = isRecord(value) ? value.data : undefined;
+  if (!isRecord(data) || typeof data.running !== 'boolean') return false;
+  const last = data.lastFullCheck;
+  if (last === null) return true;
+  return (
+    isRecord(last) &&
+    typeof last.finishedAt === 'string' &&
+    [
+      'checked',
+      'open',
+      'closed',
+      'probablyClosed',
+      'unknown',
+      'discarded',
+      'flagged',
+      'heldBack',
+    ].every(key => hasCount(last[key]))
+  );
+}
+
 function isRunLogResponse(value: unknown): value is RunLogResponse {
   return (
     isRecord(value) &&
@@ -891,6 +981,13 @@ export function createApi(fetcher: typeof fetch = fetch) {
       if (query.scoreMin !== undefined) params.set('scoreMin', String(query.scoreMin));
       if (query.scoreMax !== undefined) params.set('scoreMax', String(query.scoreMax));
       if (query.addedWeek) params.set('addedWeek', query.addedWeek);
+      // The server accepts only favorite=true, so the parameter is omitted when the filter is off.
+      if (query.favorite) params.set('favorite', 'true');
+      if (query.yoeMax !== undefined) {
+        params.set('yoeMax', String(query.yoeMax));
+        if (query.yoeUnknown) params.set('yoeUnknown', query.yoeUnknown);
+      }
+      if (query.posting) params.set('posting', query.posting);
       if (cursor) params.set('cursor', cursor);
       const result = await read<unknown>(`/api/v1/jobs?${params}`, fetcher, signal);
       if (!isJobsResponse(result)) throw invalidResponse();
@@ -920,6 +1017,23 @@ export function createApi(fetcher: typeof fetch = fetch) {
       });
       if (!isJobWriteResponse(result)) throw invalidResponse();
       return result;
+    },
+    // A favorite is a label: no revision, and it never changes status or score.
+    setFavorite: async (id: string, favorite: boolean, nonce: string, signal: AbortSignal) => {
+      const result = await read<unknown>(
+        `/api/v1/jobs/${checkedId(id)}/favorite`,
+        fetcher,
+        signal,
+        {
+          method: 'PUT',
+          body: { favorite } satisfies JobFavoriteRequest,
+          nonce,
+        },
+      );
+      const data = isRecord(result) ? result.data : undefined;
+      if (!isRecord(data) || data.id !== id || typeof data.favorite !== 'boolean')
+        throw invalidResponse();
+      return result as JobFavoriteResponse;
     },
     changeMetadata: async (
       id: string,
@@ -1040,6 +1154,20 @@ export function createApi(fetcher: typeof fetch = fetch) {
       if (!isRunCreateResponse(result)) throw invalidResponse();
       return result;
     },
+    startLiveness: async (body: LivenessRunRequest, nonce: string, signal: AbortSignal) => {
+      const result = await read<unknown>('/api/v1/runs', fetcher, signal, {
+        method: 'POST',
+        body,
+        nonce,
+      });
+      if (!isRunCreateResponse(result)) throw invalidResponse();
+      return result;
+    },
+    livenessSummary: async (signal: AbortSignal) => {
+      const result = await read<unknown>('/api/v1/liveness/summary', fetcher, signal);
+      if (!isLivenessSummary(result)) throw invalidResponse();
+      return result;
+    },
     startJobRun: async (body: JobRunRequest, nonce: string, signal: AbortSignal) => {
       const result = await read<unknown>('/api/v1/runs', fetcher, signal, {
         method: 'POST',
@@ -1047,6 +1175,25 @@ export function createApi(fetcher: typeof fetch = fetch) {
         nonce,
       });
       if (!isRunCreateResponse(result)) throw invalidResponse();
+      return result;
+    },
+    startEvaluateBatch: async (body: BatchRequest, nonce: string, signal: AbortSignal) => {
+      const result = await read<unknown>('/api/v1/runs/evaluate-batch', fetcher, signal, {
+        method: 'POST',
+        body,
+        nonce,
+      });
+      if (!isBatchResponse(result)) throw invalidResponse();
+      return result;
+    },
+    cancelQueuedRuns: async (groupId: string, nonce: string, signal: AbortSignal) => {
+      const result = await read<unknown>(
+        `/api/v1/runs/groups/${encodeURIComponent(groupId)}/cancel-queued`,
+        fetcher,
+        signal,
+        { method: 'POST', body: {}, nonce },
+      );
+      if (!isCancelQueuedResponse(result)) throw invalidResponse();
       return result;
     },
     // `limit` raises how many terminal rows come back (server default 12, at most 50). It is sent

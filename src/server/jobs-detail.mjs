@@ -23,7 +23,7 @@ export const jobDetailSql = Object.freeze({
   SELECT job.id::text AS id, job.revision::text AS revision, job.company, job.role,
          job.url, job.status, job.score::text AS score, job.source_date::text AS source_date,
          job.notes, job.report_path, job.salary_min::text AS salary_min,
-         job.salary_max::text AS salary_max,
+         job.salary_max::text AS salary_max, job.favorite,
          (job.evaluation_error IS NOT NULL AND btrim(job.evaluation_error) <> '') AS evaluation_error,
          discovery.first_seen::text AS first_seen,
          (status_event.occurred_at AT TIME ZONE 'America/Toronto')::date::text AS status_date,
@@ -53,6 +53,8 @@ export const jobDetailSql = Object.freeze({
   FROM evaluations WHERE job_id = $1::bigint ORDER BY id DESC`,
   activeRuns: `SELECT id::text AS id, action FROM browser_runs
   WHERE job_id = $1::bigint AND state IN ('queued', 'running') ORDER BY created_at, id`,
+  posting: `SELECT state, action, method, detail, checked_at FROM posting_checks
+  WHERE job_id = $1::bigint ORDER BY checked_at DESC, id DESC LIMIT 1`,
   events: `SELECT id::text AS id, old_status, new_status, reason, actor, occurred_at, created_at
   FROM job_status_events WHERE job_id = $1::bigint ORDER BY id ASC`,
 });
@@ -284,6 +286,16 @@ export function createJobsDetail({
     }
   }
 
+  // Latest posting check; none when posting_checks is unavailable (migration 014 not applied).
+  async function postingRow(id) {
+    try {
+      const rows = await query(jobDetailSql.posting, [id]);
+      return Array.isArray(rows) ? rows : [];
+    } catch {
+      return [];
+    }
+  }
+
   // The action prerequisites alone, for the run service's dispatch re-check. `base` ignores
   // active runs (the run service reports those as RUN_ACTIVE); `actions` is the full block.
   async function actionsFor(id) {
@@ -307,11 +319,12 @@ export function createJobsDetail({
   async function detail(id) {
     checkId(id);
     const row = await loadJob(id);
-    const [jdRows, evaluationRows, eventRows, activeRows] = await Promise.all([
+    const [jdRows, evaluationRows, eventRows, activeRows, postingRows] = await Promise.all([
       select(jobDetailSql.jd, id),
       select(jobDetailSql.evaluations, id),
       select(jobDetailSql.events, id),
       activeRunRows(id),
+      postingRow(id),
     ]);
     const [compensation, report, materials, prep] = await Promise.all([
       readCompensation(row, rootDir),
@@ -327,6 +340,16 @@ export function createJobsDetail({
       ...projectJob(row, new Map([[String(row.id), flags]]), compensation),
       notes: String(row.notes ?? ''),
       evaluationError: Boolean(row.evaluation_error),
+      // Latest posting check with its method and detail; null when never checked.
+      posting: postingRows[0]
+        ? {
+            state: postingRows[0].state,
+            action: postingRows[0].action,
+            checkedAt: iso(postingRows[0].checked_at),
+            method: String(postingRows[0].method ?? ''),
+            detail: String(postingRows[0].detail ?? ''),
+          }
+        : null,
     };
     const jd = jdRows[0]
       ? {

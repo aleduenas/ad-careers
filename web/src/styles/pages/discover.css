@@ -1,0 +1,44 @@
+/* The discover page. */
+
+/* Package 3.3: Discover page */
+.discover-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+.discover-card {
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
+
+.paste-step {
+  display: grid;
+  gap: 10px;
+}
+
+.url-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.run-state {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.run-state .quiet-button {
+  width: fit-content;
+}
+
+@media (min-width: 1024px) {
+  .discover-grid {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+    align-items: start;
+  }
+}

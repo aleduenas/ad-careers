@@ -1,0 +1,58 @@
+/* The SlidePanel component. */
+
+.ws-panel {
+  position: fixed;
+  z-index: 40;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.ws-panel[hidden] {
+  display: none;
+}
+
+.ws-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 20px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ws-panel-head h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.ws-panel-body {
+  display: grid;
+  flex: 1;
+  align-content: start;
+  gap: 22px;
+  min-height: 0;
+  padding: 18px 20px 28px;
+  overflow: auto;
+}
+
+@media (min-width: 1024px) {
+  .ws-panel {
+    inset: 0 68px 0 auto;
+    width: min(50vw, 760px);
+    border-left: 1px solid var(--line);
+    box-shadow: -8px 0 28px #10201c33;
+  }
+}
+
+.ws-panel-solo {
+  /* No rail beside it on the Jobs page. */
+}
+
+@media (min-width: 1024px) {
+  .ws-panel.ws-panel-solo {
+    right: 0;
+  }
+}

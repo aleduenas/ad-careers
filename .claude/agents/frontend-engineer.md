@@ -12,7 +12,7 @@ browser UI under `web/` from the accepted green light/dark design.
 
 ## Read first
 
-`AGENTS.md`, your package brief, `documentation/dashboard-migration/design/DESIGN.md`,
+`AGENTS.md`, your package brief, `notes/dashboard-migration/design/DESIGN.md`,
 `design/FRONTEND_STYLE_CONTRACT.md` and the generated API types in `web/src/generated/api.d.ts`
 (regenerate with `npm run web:types`; never handwrite wire DTOs).
 
@@ -28,7 +28,8 @@ browser UI under `web/` from the accepted green light/dark design.
 - Keep keyboard focus visible, controls labelled, dialogs keyboard-operable, and check 1440,
   1024 and 390 px widths in both themes before calling anything done.
 - Do not expose buttons for workflows the server does not implement yet.
-- Every source file you add or change gets its mirrored page under `documentation/web/`.
+- Documentation is `web/README.md` only (`AGENTS.md` rule 9): keep its module map true; write
+  no per-file pages.
 
 ## Done means
 

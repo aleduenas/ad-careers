@@ -2,6 +2,7 @@ import { readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { resolve, relative, isAbsolute } from 'node:path';
 import { createHash } from 'node:crypto';
 import { root, query } from './_database.mjs';
+import { yoeForJob } from './yoe.mjs';
 
 export function readJDFile(path, base = root) {
   const folder = realpathSync(resolve(base, 'data', 'jds')),
@@ -18,16 +19,15 @@ export function readJDFile(path, base = root) {
   };
 }
 export async function syncJD(id, path) {
-  await query('SELECT id FROM jobs WHERE id=$1', [id]).then(rows => {
-    if (!rows.length) throw new Error('Unknown job ' + id);
-  });
+  const [job] = await query('SELECT id, role FROM jobs WHERE id=$1', [id]);
+  if (!job) throw new Error('Unknown job ' + id);
   let j = readJDFile(path);
   const tagged = withJobID(j.content, id);
   if (tagged !== j.content) {
     writeFileSync(realpathSync(resolve(root, path)), tagged, 'utf8');
     j = readJDFile(path);
   }
-  return (
+  const row = (
     await query('SELECT * FROM sync_job_description($1,$2,$3,$4)', [
       id,
       j.content,
@@ -35,6 +35,23 @@ export async function syncJD(id, path) {
       j.content_hash,
     ])
   )[0];
+  await recordYoe(id, j.content, job.role);
+  return row;
+}
+// D116: store the years-of-experience estimate beside the description. Never fails the caller:
+// a parser or database error leaves the columns as they were.
+export async function recordYoe(id, content, title, run = query) {
+  const columns = yoeForJob(content, title);
+  try {
+    await run('UPDATE job_descriptions SET yoe_min=$2, yoe_confidence=$3 WHERE job_id=$1', [
+      id,
+      columns.yoe_min,
+      columns.yoe_confidence,
+    ]);
+    return columns;
+  } catch {
+    return null;
+  }
 }
 export function jdJobID(content) {
   return content.match(/<!-- career-ops-job-id: (\d+) -->/)?.[1] || null;

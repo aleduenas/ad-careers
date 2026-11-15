@@ -14,6 +14,9 @@ import {
 } from './letter.mjs';
 import { DatabaseUnavailableError } from './readiness.mjs';
 
+// Test guard: a test never reaches the configured database (see src/lib/_database.mjs).
+process.env.CAREER_OPS_TEST_GUARD = '1';
+
 const sha = text => createHash('sha256').update(text).digest('hex');
 
 // A temporary repository root with output/<company>/<role>--<id>/ and a stub for the two job

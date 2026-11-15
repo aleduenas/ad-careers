@@ -4,7 +4,7 @@ import { basename, join } from 'node:path';
 import { root as repositoryRoot } from '../lib/root.mjs';
 
 // Read-only view of the task records the retired Go TUI left under logs/dashboard/tasks/
-// (listed as source 'legacy'). Record format: documentation/src/server/legacy-runs.md and
+// (listed as source 'legacy'). Record format: see
 // src/lib/_task-status.mjs. Nothing here writes,
 // deletes or signals anything, and a bad record is skipped and counted, never thrown.
 //

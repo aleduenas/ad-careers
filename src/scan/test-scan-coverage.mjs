@@ -8,7 +8,17 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import yaml from 'js-yaml';
 
-import { buildTitleFilter, companyRoleKey, loadProviders } from './scan.mjs';
+import {
+  buildLocationFilter,
+  buildTitleFilter,
+  directFirstGate,
+  companyRoleKey,
+  laneConcurrency,
+  laneKey,
+  loadProviders,
+  processJobs,
+  runLanes,
+} from './scan.mjs';
 import ashbyProvider from './providers/ashby-api.mjs';
 import greenhouseProvider from './providers/greenhouse-api.mjs';
 import pinpointProvider, { parsePinpointResponse } from './providers/pinpoint.mjs';
@@ -17,9 +27,13 @@ import successFactorsProvider, {
   parseSuccessFactorsTiles,
 } from './providers/successfactors.mjs';
 import workableProvider, { parseWorkableMarkdown } from './providers/workable.mjs';
+import { urlKey } from '../lib/_database.mjs';
 import { classifyPortal, verifyPortalEntries } from '../helpers/verify-portals.mjs';
 
 import { root as ROOT } from '../lib/root.mjs';
+
+// Test guard: a test never reaches the configured database (see src/lib/_database.mjs).
+process.env.CAREER_OPS_TEST_GUARD = '1';
 
 async function fixtureTests() {
   const titleRules = { positive: ['Data Engineer'], negative: ['Staff', 'Lead', 'Manager'] };
@@ -296,6 +310,160 @@ async function verifierTests() {
   );
 }
 
+async function directFirstTests() {
+  const filters = { titleFilter: () => true, locationFilter: () => true };
+  const body = 'Full job description line. '.repeat(20);
+  const job = (url, extra = {}) => ({
+    title: 'Data Engineer (5440)',
+    company: 'Acme Inc.',
+    url,
+    location: 'Toronto, Ontario',
+    content: body,
+    ...extra,
+  });
+  const direct = { id: 'greenhouse' };
+  const aggregator = { id: 'remoteok', aggregator: true };
+  const freshRun = (roles = []) => ({
+    seenUrls: new Set(),
+    seenCompanyRoles: new Set(roles),
+    dryRun: true,
+    date: '2026-11-14',
+    counts: { filteredTitle: 0, filteredLocation: 0, dupes: 0, gateFailed: 0, missingContent: 0 },
+    missingFullJd: [],
+    newOffers: [],
+  });
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+  // Either lane may finish fetching first; the direct posting still wins.
+  for (const [directDelay, aggregatorDelay] of [
+    [40, 0],
+    [0, 40],
+  ]) {
+    const run = freshRun();
+    const gateway = directFirstGate([direct, aggregator]);
+    const task = (provider, delay, jobs) => async () => {
+      try {
+        await sleep(delay);
+        await gateway.waitForDirect(provider);
+        await processJobs({ provider, jobs, ...filters, run });
+      } finally {
+        gateway.finish(provider);
+      }
+    };
+    await runLanes([
+      {
+        provider: aggregator,
+        entry: { name: 'Remote OK' },
+        task: task(aggregator, aggregatorDelay, [
+          job('https://remoteok.com/remote-jobs/1', { title: 'Data Engineer', company: 'ACME' }),
+        ]),
+      },
+      {
+        provider: direct,
+        entry: { name: 'Acme' },
+        task: task(direct, directDelay, [job('https://boards.greenhouse.io/acme/jobs/1')]),
+      },
+    ]);
+    assert.equal(run.newOffers.length, 1, 'one new job for the same company and role');
+    assert.equal(run.newOffers[0].url, 'https://boards.greenhouse.io/acme/jobs/1');
+    assert.equal(run.newOffers[0].source, 'greenhouse-api');
+    assert.equal(run.counts.dupes, 1);
+  }
+
+  // A role already in the database (jobs or scan_history) yields no new job.
+  const known = freshRun([companyRoleKey('Acme', 'Data Engineer')]);
+  await processJobs({
+    provider: aggregator,
+    jobs: [job('https://remoteok.com/remote-jobs/2')],
+    ...filters,
+    run: known,
+  });
+  assert.equal(known.newOffers.length, 0);
+  assert.equal(known.counts.dupes, 1);
+
+  // Known limits: a different company name or role wording is a different key.
+  assert.notEqual(
+    companyRoleKey('Loblaw', 'Data Engineer'),
+    companyRoleKey('Loblaw Digital', 'Data Engineer'),
+  );
+  assert.notEqual(
+    companyRoleKey('Acme', 'Data Engineer (Remote)'),
+    companyRoleKey('Acme', 'Data Engineer'),
+  );
+
+  // No direct provider at all: aggregators are not left waiting.
+  await directFirstGate([aggregator]).waitForDirect(aggregator);
+}
+
+async function badPostingTests() {
+  // One malformed posting must not throw out of the filters.
+  const title = buildTitleFilter({ positive: ['Engineer'] });
+  for (const bad of [undefined, null, 42, {}]) assert.equal(title(bad), false);
+  const location = buildLocationFilter({ allow: ['toronto'] });
+  for (const bad of [undefined, null, 42, {}, '']) assert.equal(location(bad), true);
+  assert.equal(location('Paris'), false);
+  assert.doesNotThrow(() => urlKey(undefined) ?? urlKey(42));
+}
+
+async function laneTests() {
+  assert.equal(laneKey({ id: 'greenhouse' }, { name: 'A' }), 'greenhouse');
+  assert.equal(
+    laneKey({ id: 'workday' }, { name: 'A', workday_tenant: 'acme', workday_host: 'wd3' }),
+    'workday:acme.wd3',
+  );
+  assert.equal(
+    laneKey({ id: 'pinpoint' }, { name: 'A', careers_url: 'https://Foo.pinpointhq.com/x' }),
+    'pinpoint:foo.pinpointhq.com',
+  );
+  assert.equal(laneKey({ id: 'x', lane: () => 'custom' }, { name: 'A' }), 'custom');
+  assert.equal(laneConcurrency({ id: 'lever' }), 4);
+  assert.equal(laneConcurrency({ id: 'workday' }), 1);
+  assert.equal(laneConcurrency({ id: 'workday', laneConcurrency: 3 }), 3);
+
+  // Fake services record in-flight counts and overlap.
+  const tracker = { inflight: {}, max: {}, total: 0, maxTotal: 0, done: [] };
+  const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+  const item = (providerId, name, { fail = false, provider = {} } = {}) => ({
+    provider: { id: providerId, ...provider },
+    entry: { name },
+    task: async () => {
+      const lane = laneKey({ id: providerId, ...provider }, { name });
+      tracker.inflight[lane] = (tracker.inflight[lane] || 0) + 1;
+      tracker.max[lane] = Math.max(tracker.max[lane] || 0, tracker.inflight[lane]);
+      tracker.total++;
+      tracker.maxTotal = Math.max(tracker.maxTotal, tracker.total);
+      try {
+        await sleep(25);
+        // Tasks isolate their own errors, as scan.mjs company tasks do.
+        if (fail) throw new Error('boom');
+        tracker.done.push(name);
+      } catch {
+        tracker.done.push(name + ':failed');
+      } finally {
+        tracker.inflight[lane]--;
+        tracker.total--;
+      }
+    },
+  });
+  const lanes = await runLanes([
+    item('slow', 's1'),
+    item('slow', 's2', { fail: true }),
+    item('slow', 's3'),
+    item('fast', 'f1', { provider: { laneConcurrency: 2 } }),
+    item('fast', 'f2', { provider: { laneConcurrency: 2 } }),
+    item('fast', 'f3', { provider: { laneConcurrency: 2 } }),
+  ]);
+  assert.equal(lanes, 2);
+  assert.equal(tracker.max.slow, 1, 'a concurrency-1 lane never has two companies in flight');
+  assert.equal(tracker.max.fast, 2);
+  assert(tracker.maxTotal >= 3, 'lanes overlap in time');
+  assert.equal(tracker.done.length, 6, 'a failing company does not stop its lane or others');
+  assert(tracker.done.includes('s2:failed') && tracker.done.includes('s3'));
+}
+
+await directFirstTests();
+await badPostingTests();
+await laneTests();
 await fixtureTests();
 await verifierTests();
 console.log('scan coverage/provider tests OK');

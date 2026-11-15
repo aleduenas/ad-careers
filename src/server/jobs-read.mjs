@@ -4,6 +4,7 @@ import { root as repositoryRoot } from '../lib/root.mjs';
 import { DatabaseUnavailableError, SchemaNotReadyError } from './readiness.mjs';
 import { resolveJobMaterials } from './jobs-materials.mjs';
 import { readReportCompensation } from './jobs-compensation.mjs';
+import { compileSearch, parseSearch } from './jobs-search.mjs';
 
 const STATUSES = [
   'Pending',
@@ -28,16 +29,28 @@ const FILTERS = new Set([
   'discarded',
   'offer',
 ]);
-const SORTS = new Set(['score', 'statusDate', 'addedDate', 'company']);
+const SORTS = new Set(['score', 'statusDate', 'addedDate', 'company', 'favorite', 'yoe']);
+const POSTING_FILTERS = new Set(['expired', 'applied-closed']);
 const BASE_SQL = `
   SELECT job.id::text AS id, job.revision::text AS revision, job.company, job.role,
          job.url, job.status, job.score::text AS score, job.source_date::text AS source_date,
          job.notes, job.report_path, job.salary_min::text AS salary_min,
-         job.salary_max::text AS salary_max,
+         job.salary_max::text AS salary_max, job.favorite,
          discovery.first_seen::text AS first_seen,
          (status_event.occurred_at AT TIME ZONE 'America/Toronto')::date::text AS status_date,
-         discard_event.reason AS discard_reason
+         discard_event.reason AS discard_reason,
+         description.yoe_min, description.yoe_confidence,
+         posting.state AS posting_state, posting.action AS posting_action,
+         to_char(posting.checked_at AT TIME ZONE 'UTC', 'YYYY-MM-DD"T"HH24:MI:SS"Z"')
+           AS posting_checked_at
   FROM jobs AS job
+  LEFT JOIN job_descriptions AS description ON description.job_id = job.id
+  LEFT JOIN LATERAL (
+    SELECT check_row.state, check_row.action, check_row.checked_at
+    FROM posting_checks AS check_row
+    WHERE check_row.job_id = job.id
+    ORDER BY check_row.checked_at DESC, check_row.id DESC LIMIT 1
+  ) AS posting ON true
   LEFT JOIN LATERAL (
     SELECT min(history.first_seen) AS first_seen
     FROM scan_history AS history WHERE history.url = job.url
@@ -105,15 +118,25 @@ export function normalizeJobsQuery(raw = {}) {
     'scoreMin',
     'scoreMax',
     'addedWeek',
+    'favorite',
+    'yoeMax',
+    'yoeUnknown',
+    'posting',
   ]);
   for (const key of Object.keys(raw)) if (!allowed.has(key)) throw requestError(key);
   const q = raw.q ?? '';
   if (typeof q !== 'string' || [...q].length > 200) throw requestError('q');
+  const search = parseSearch(q);
+  if (search.error) {
+    const error = requestError('q', search.error);
+    error.fields = { q: search.error };
+    throw error;
+  }
   const filter = raw.filter ?? 'all';
   if (typeof filter !== 'string' || !FILTERS.has(filter)) throw requestError('filter');
   const sort = raw.sort ?? 'score';
   if (typeof sort !== 'string' || !SORTS.has(sort)) throw requestError('sort');
-  const direction = raw.direction ?? (sort === 'company' ? 'asc' : 'desc');
+  const direction = raw.direction ?? (sort === 'company' || sort === 'yoe' ? 'asc' : 'desc');
   if (direction !== 'asc' && direction !== 'desc') throw requestError('direction');
   let grouped = raw.grouped ?? 'true';
   if (grouped === true || grouped === false) grouped = String(grouped);
@@ -133,6 +156,29 @@ export function normalizeJobsQuery(raw = {}) {
     throw requestError('scoreMax');
   if (scoreMin !== undefined) query.scoreMin = scoreMin;
   if (scoreMax !== undefined) query.scoreMax = scoreMax;
+  if (raw.favorite !== undefined) {
+    if (raw.favorite !== 'true' && raw.favorite !== true) throw requestError('favorite');
+    query.favorite = true;
+  }
+  if (raw.yoeMax !== undefined) {
+    const text = String(raw.yoeMax);
+    if (
+      !['string', 'number'].includes(typeof raw.yoeMax) ||
+      !/^(?:0|[1-9][0-9]?)$/.test(text) ||
+      Number(text) > 40
+    )
+      throw requestError('yoeMax');
+    query.yoeMax = Number(text);
+  }
+  if (raw.yoeUnknown !== undefined) {
+    if (raw.yoeUnknown !== 'exclude') throw requestError('yoeUnknown');
+    query.yoeUnknown = 'exclude';
+  }
+  if (raw.posting !== undefined) {
+    if (typeof raw.posting !== 'string' || !POSTING_FILTERS.has(raw.posting))
+      throw requestError('posting');
+    query.posting = raw.posting;
+  }
   if (raw.addedWeek !== undefined) {
     if (typeof raw.addedWeek !== 'string' || !WEEK_PATTERN.test(raw.addedWeek))
       throw requestError('addedWeek');
@@ -183,9 +229,9 @@ function normalizedText(value) {
   return String(value ?? '').toLocaleLowerCase('en-CA');
 }
 
-function matches(row, q) {
-  if (!q) return true;
-  const needle = normalizedText(q);
+// One search term against the searched fields (id, #id, company, role, notes, discard reason).
+function termMatches(row, term) {
+  const needle = normalizedText(term);
   return [row.id, `#${row.id}`, row.company, row.role, row.notes, row.discard_reason].some(value =>
     normalizedText(value).includes(needle),
   );
@@ -259,7 +305,20 @@ function compareRows(a, b, query, materialMap) {
   }
   let primary = 0;
   let secondary = 0;
-  if (query.sort === 'score') {
+  if (query.sort === 'favorite') {
+    // Favorites first (desc) or last (asc); inside each side the default order: score, newest.
+    primary = compareNumberDirection(
+      a.favorite === true ? 1 : 0,
+      b.favorite === true ? 1 : 0,
+      query.direction,
+    );
+    const as = a.score == null ? null : Number(a.score);
+    const bs = b.score == null ? null : Number(b.score);
+    secondary = compareNumberDirection(as, bs, 'desc');
+  } else if (query.sort === 'yoe') {
+    // Lowest estimate first (or highest with desc); jobs with no estimate always last.
+    primary = compareNumberDirection(safeNumber(a.yoe_min), safeNumber(b.yoe_min), query.direction);
+  } else if (query.sort === 'score') {
     const as = a.score == null ? null : Number(a.score);
     const bs = b.score == null ? null : Number(b.score);
     primary = compareNumberDirection(as, bs, query.direction);
@@ -291,6 +350,18 @@ function selected(row, filter) {
       !['Ghosted', 'Discarded'].includes(row.status)
     );
   return row.status.toLowerCase() === filter;
+}
+
+// D116 and D117 filters: years of experience and the latest posting check.
+function matchesYoeAndPosting(row, query) {
+  const yoe = safeNumber(row.yoe_min);
+  if (query.yoeUnknown === 'exclude' && yoe === null) return false;
+  if (query.yoeMax !== undefined && yoe !== null && yoe > query.yoeMax) return false;
+  if (query.posting === 'expired')
+    return row.status === 'Discarded' && row.posting_action === 'discarded';
+  if (query.posting === 'applied-closed')
+    return row.status === 'Applied' && ['closed', 'probably_closed'].includes(row.posting_state);
+  return true;
 }
 
 function inScoreWeek(row, query) {
@@ -377,6 +448,16 @@ export function projectJob(row, materialMap, compensation) {
     addedDate: addedDate(row),
     statusDate: row.status_date || null,
     discardReason: row.discard_reason || null,
+    favorite: row.favorite === true,
+    yoeMin: safeNumber(row.yoe_min),
+    yoeConfidence: row.yoe_min == null ? null : (row.yoe_confidence ?? null),
+    posting: row.posting_state
+      ? {
+          state: row.posting_state,
+          action: row.posting_action,
+          checkedAt: row.posting_checked_at ?? null,
+        }
+      : null,
     salary,
     compensation: comp,
     materials: materialMap.get(String(row.id)) || { cv: false, letter: false },
@@ -504,11 +585,14 @@ export function createJobsReader({
     const { query: normalized, cursor } = normalizeJobsQuery(rawQuery);
     const offset = cursor === undefined ? 0 : verifyOffset(cursor, normalized, key);
     const rows = await loadRows();
+    const matchesQuery = compileSearch(parseSearch(normalized.q), termMatches);
     const filtered = rows.filter(
       row =>
         selected(row, normalized.filter) &&
-        matches(row, normalized.q) &&
-        inScoreWeek(row, normalized),
+        (!normalized.favorite || row.favorite === true) &&
+        matchesQuery(row) &&
+        inScoreWeek(row, normalized) &&
+        matchesYoeAndPosting(row, normalized),
     );
     const materials = await resolveMaterials(filtered, rootDir);
     const map = materials instanceof Map ? materials : new Map(Object.entries(materials || {}));

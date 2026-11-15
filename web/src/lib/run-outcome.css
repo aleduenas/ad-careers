@@ -1,0 +1,11 @@
+/* A run that only needs a location decision: shown as attention, not as a failure. */
+.run-badge.run-review {
+  border-color: var(--orange);
+  background: var(--orange-bg);
+  color: var(--orange);
+}
+
+.run-error.run-review-text,
+.task-extra-error.run-review-text {
+  color: var(--orange);
+}

@@ -12,6 +12,9 @@ import {
   verbatimShare,
 } from './intake-extract.mjs';
 
+// Test guard: a test never reaches the configured database (see src/lib/_database.mjs).
+process.env.CAREER_OPS_TEST_GUARD = '1';
+
 // Mocked CLI only: no model call, no real subprocess.
 
 const POSTING = 'Responsibilities include building and running data pipelines. '.repeat(30).trim();

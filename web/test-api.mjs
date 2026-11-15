@@ -1,5 +1,13 @@
 import { createApi, ApiFailure } from './src/api.ts';
 import assert from 'node:assert/strict';
+import {
+  commentRoom,
+  discardProblem,
+  discardReasonText,
+  DISCARD_REASON_LIMIT,
+  NO_REASON,
+  visibleDiscardReason,
+} from './src/lib/discard.ts';
 import test from 'node:test';
 
 function response(status, body) {
@@ -261,6 +269,150 @@ test('jobs and overview responses are guarded against malformed payloads', async
     invalidOverviewClient.overview(new AbortController().signal),
     error => error.code === 'INVALID_RESPONSE',
   );
+});
+
+test('jobs reader accepts the favorite, years-of-experience and posting-check shapes', async () => {
+  const envelope = data => ({
+    data,
+    meta: { requestId: 'synthetic', observedAt: '2026-01-01T00:00:00Z' },
+  });
+  const checkedAt = '2026-11-15T06:00:00Z';
+  for (const query of [
+    { q: '', filter: 'all', sort: 'favorite', direction: 'desc', grouped: true, limit: 50, favorite: true },
+    { q: '', filter: 'all', sort: 'yoe', direction: 'asc', grouped: false, limit: 50, yoeMax: 5, yoeUnknown: 'exclude', posting: 'expired' },
+  ]) {
+    const body = envelope({
+      items: [
+        syntheticJob({ favorite: true, yoeMin: 3, yoeConfidence: 'inferred', posting: { state: 'open', action: 'none', checkedAt } }),
+        syntheticJob({ id: '12', favorite: false, yoeMin: null, yoeConfidence: null, posting: null }),
+      ],
+      totalCount: 2,
+      nextCursor: null,
+      previousCursor: null,
+      query,
+    });
+    const result = await createApi(async () => response(200, body)).jobs(query, null, new AbortController().signal);
+    assert.equal(result.data.query.sort, query.sort);
+  }
+  const bad = [
+    ['unknown sort', { sort: 'nope' }],
+    ['bad yoe flag', { yoeUnknown: 'include' }],
+  ];
+  for (const [kind, patch] of bad) {
+    const query = { q: '', filter: 'all', sort: 'score', direction: 'desc', grouped: true, limit: 50, ...patch };
+    const body = envelope({ items: [syntheticJob()], totalCount: 1, nextCursor: null, previousCursor: null, query });
+    await assert.rejects(
+      createApi(async () => response(200, body)).jobs(query, null, new AbortController().signal),
+      error => error.code === 'INVALID_RESPONSE',
+      kind,
+    );
+  }
+  const badPosting = envelope({
+    items: [syntheticJob({ posting: { state: 'gone', action: 'none', checkedAt } })],
+    totalCount: 1,
+    nextCursor: null,
+    previousCursor: null,
+    query: { q: '', filter: 'all', sort: 'score', direction: 'desc', grouped: true, limit: 50 },
+  });
+  await assert.rejects(
+    createApi(async () => response(200, badPosting)).jobs(badPosting.data.query, null, new AbortController().signal),
+    error => error.code === 'INVALID_RESPONSE',
+  );
+});
+
+test('runs reader accepts a posting check run', async () => {
+  const run = {
+    id: '00000000-0000-4000-8000-000000000001',
+    requestKey: 'k',
+    groupId: null,
+    action: 'liveness',
+    jobId: null,
+    state: 'completed',
+    phase: 'done',
+    attempt: 1,
+    exitCode: 0,
+    errorCode: null,
+    createdAt: '2026-11-15T06:00:00Z',
+    startedAt: null,
+    updatedAt: '2026-11-15T06:00:00Z',
+    finishedAt: null,
+    selection: null,
+    source: 'browser',
+  };
+  const body = { data: { runs: [run] }, meta: { requestId: 'synthetic', observedAt: '2026-01-01T00:00:00Z' } };
+  const result = await createApi(async () => response(200, body)).runs(new AbortController().signal);
+  assert.equal(result.data.runs[0].action, 'liveness');
+});
+
+test('posting check calls: summary guard, start body and the jobs query parameters', async () => {
+  const meta = { requestId: 'synthetic', observedAt: '2026-01-01T00:00:00Z' };
+  const last = {
+    finishedAt: '2026-11-15T06:00:00Z',
+    checked: 10,
+    open: 6,
+    closed: 2,
+    probablyClosed: 1,
+    unknown: 1,
+    discarded: 2,
+    flagged: 1,
+    heldBack: 0,
+  };
+  for (const lastFullCheck of [null, last]) {
+    const client = createApi(async () => response(200, { data: { running: false, lastFullCheck }, meta }));
+    const result = await client.livenessSummary(new AbortController().signal);
+    assert.deepEqual(result.data.lastFullCheck, lastFullCheck);
+  }
+  for (const bad of [{ running: 'no', lastFullCheck: null }, { running: false, lastFullCheck: { ...last, open: -1 } }, { running: false }]) {
+    await assert.rejects(
+      createApi(async () => response(200, { data: bad, meta })).livenessSummary(new AbortController().signal),
+      error => error.code === 'INVALID_RESPONSE',
+    );
+  }
+  const calls = [];
+  const run = {
+    id: '00000000-0000-4000-8000-000000000002', requestKey: 'k', groupId: null, action: 'liveness', jobId: '12',
+    state: 'queued', phase: 'queued', attempt: 1, exitCode: null, errorCode: null, createdAt: '2026-11-15T06:00:00Z',
+    startedAt: null, updatedAt: '2026-11-15T06:00:00Z', finishedAt: null, selection: null, source: 'browser',
+  };
+  const client = createApi(async (url, options) => {
+    calls.push({ url: String(url), options });
+    return response(String(url).includes('/runs') ? 201 : 200, String(url).includes('/runs')
+      ? { data: { runs: [run] }, meta }
+      : { data: { items: [], totalCount: 0, nextCursor: null, previousCursor: null, query: { q: '', filter: 'all', sort: 'yoe', direction: 'asc', grouped: true, limit: 50, yoeMax: 5, yoeUnknown: 'exclude', posting: 'expired' } }, meta });
+  });
+  await client.startLiveness({ action: 'liveness', requestKey: 'k', jobId: '12' }, 'nonce-value', new AbortController().signal);
+  assert.equal(calls[0].options.method, 'POST');
+  assert.equal(calls[0].options.headers['x-career-ops-session'], 'nonce-value');
+  assert.deepEqual(JSON.parse(calls[0].options.body), { action: 'liveness', requestKey: 'k', jobId: '12' });
+  await client.jobs({ q: '', filter: 'all', sort: 'yoe', direction: 'asc', grouped: true, limit: 50, yoeMax: 5, yoeUnknown: 'exclude', posting: 'expired' }, null, new AbortController().signal);
+  const params = new URL(calls[1].url, 'http://x').searchParams;
+  assert.equal(params.get('yoeMax'), '5');
+  assert.equal(params.get('yoeUnknown'), 'exclude');
+  assert.equal(params.get('posting'), 'expired');
+  await client.jobs({ q: '', filter: 'all', sort: 'score', direction: 'desc', grouped: true, limit: 50, yoeUnknown: 'exclude' }, null, new AbortController().signal);
+  const loose = new URL(calls[2].url, 'http://x').searchParams;
+  assert.equal(loose.has('yoeUnknown'), false, 'the no-estimate flag is only sent with a limit');
+});
+
+test('discard reason text: none, reason, comment, both, and the server length cap', () => {
+  assert.equal(discardReasonText(null, ''), 'No reason given');
+  assert.equal(discardReasonText(null, '   '), NO_REASON);
+  assert.equal(discardReasonText('Expired', ''), 'Expired');
+  assert.equal(discardReasonText(null, ' Staff level '), 'Staff level');
+  assert.equal(discardReasonText('Title mismatch', 'Staff level'), 'Title mismatch: Staff level');
+  // The comment room leaves space for "Reason: " so the joined text is at most the server limit.
+  const reason = 'Seniority mismatch';
+  const room = commentRoom(reason);
+  assert.equal(room, DISCARD_REASON_LIMIT - reason.length - 2);
+  assert.equal(discardReasonText(reason, 'x'.repeat(room)).length, DISCARD_REASON_LIMIT);
+  assert.equal(discardProblem(reason, 'x'.repeat(room)), undefined);
+  assert.match(discardProblem(reason, 'x'.repeat(room + 1)), /1 characters too long/);
+  assert.equal(commentRoom(null), DISCARD_REASON_LIMIT);
+  assert.equal(discardProblem(null, 'x'.repeat(DISCARD_REASON_LIMIT)), undefined);
+  // A job discarded without a reason shows just "Discarded".
+  assert.equal(visibleDiscardReason(NO_REASON), null);
+  assert.equal(visibleDiscardReason(null), null);
+  assert.equal(visibleDiscardReason('Expired'), 'Expired');
 });
 
 test('safe cursor validation details survive without exposing untrusted errors', async () => {

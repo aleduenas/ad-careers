@@ -44,6 +44,7 @@ try {
     ANTHROPIC_BASE_URL: 'wrong',
     CLAUDE_CODE_USE_BEDROCK: '1',
     CLAUDECODE: 'nested',
+    FIRECRAWL_API_KEY: 'secret',
     CLAUDE_CODE_OAUTH_TOKEN: 'oauth',
   });
   assert.deepEqual(env, { PATH: 'safe', CLAUDE_CODE_OAUTH_TOKEN: 'oauth' });

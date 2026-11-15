@@ -19,6 +19,9 @@ import {
 } from './runs.mjs';
 import { RunsStoreError } from './runs-store.mjs';
 
+// Test guard: a test never reaches the configured database (see src/lib/_database.mjs).
+process.env.CAREER_OPS_TEST_GUARD = '1';
+
 // In-memory stand-in for runs-store.mjs with the same once-only, forward-only semantics as the
 // SQL functions (those are covered against PostgreSQL by test-runs-database.mjs).
 function memoryStore() {
@@ -100,6 +103,9 @@ function memoryStore() {
       const active = all.filter(run => run.state === 'queued' || run.state === 'running');
       const terminal = all.filter(run => !active.includes(run)).slice(-limit || undefined);
       return [...active, ...(limit === 0 ? [] : terminal)].map(run => ({ ...run }));
+    },
+    async listByGroup(groupId) {
+      return [...rows.values()].filter(run => run.groupId === groupId).map(run => ({ ...run }));
     },
     async get(id) {
       const run = rows.get(id);
@@ -2080,4 +2086,428 @@ test('F20: the default provider check starts <command> --version and treats only
     },
   });
   assert.equal((await thrown('claude')).available, false);
+});
+
+// ---- evaluate batches ----------------------------------------------------------------------
+
+// Fake workers: each spawn returns a controllable child; nothing real runs.
+function fakeSpawner() {
+  const children = [];
+  let pid = 40_000;
+  const spawn = (command, args) => {
+    const child = new EventEmitter();
+    child.pid = pid++;
+    child.unref = () => {};
+    child.args = args;
+    children.push(child);
+    return child;
+  };
+  return { spawn, children };
+}
+
+function batchService(rootDir, overrides = {}) {
+  const fake = fakeSpawner();
+  const made = makeService(rootDir, {
+    spawn: fake.spawn,
+    isAlive: () => true,
+    pendingJobIds: async count => ['1', '2', '3', '4', '5', '6'].slice(0, count),
+    ...overrides,
+  });
+  return { ...made, ...fake };
+}
+
+const stateOf = async (store, id) => (await store.get(id)).state;
+const exitChild = async (child, code = 0) => {
+  child.emit('exit', code);
+  await new Promise(resolve => setTimeout(resolve, 20));
+};
+
+test('batch by jobIds: one group, saved selection, concurrency bound, a fourth run starts after one finishes', async () => {
+  await withRoot(async rootDir => {
+    const { service, store, children } = batchService(rootDir, {
+      resolveSelection: async () => ({ evaluation: { provider: 'claude', model: 'm-1' } }),
+    });
+    const created = await service.dispatchEvaluateBatch({
+      requestKey: 'b-1',
+      jobIds: ['1', '2', '3', '4', '5'],
+    });
+    assert.equal(created.replayed, false);
+    assert.deepEqual(created.skipped, []);
+    assert.equal(created.runs.length, 5);
+    assert.ok(created.groupId);
+    assert.ok(
+      created.runs.every(run => run.groupId === created.groupId && run.action === 'evaluate'),
+    );
+    assert.deepEqual(
+      created.runs.map(run => run.state),
+      ['running', 'running', 'queued', 'queued', 'queued'],
+    );
+    assert.equal(children.length, 2);
+    assert.ok(children[0].args.includes('--provider=claude'));
+    assert.ok(children[0].args.includes('--model=m-1'));
+    assert.deepEqual(created.runs[3].selection, {
+      evaluation: { provider: 'claude', model: 'm-1' },
+    });
+
+    await exitChild(children[1]);
+    assert.equal(children.length, 3, 'the third starts only after one finished');
+    assert.equal(await stateOf(store, created.runs[2].id), 'running');
+    assert.equal(await stateOf(store, created.runs[3].id), 'queued');
+    await exitChild(children[0]);
+    assert.equal(children.length, 4);
+    await exitChild(children[2]);
+    assert.equal(children.length, 5);
+    for (const child of [children[3], children[4]]) await exitChild(child);
+    assert.deepEqual(await Promise.all(created.runs.map(run => stateOf(store, run.id))), [
+      'completed',
+      'completed',
+      'completed',
+      'completed',
+      'completed',
+    ]);
+  });
+});
+
+test('batch by next takes N Pending jobs in order; skipped jobs carry a reason and the rest start', async () => {
+  await withRoot(async rootDir => {
+    const asked = [];
+    const { service, children } = batchService(rootDir, {
+      pendingJobIds: async count => (asked.push(count), ['7', '404', '9']),
+      actionsFor: async id => ({
+        base: { evaluate: { reason: id === '9' ? 'No JD.' : null } },
+        actions: {},
+      }),
+    });
+    const created = await service.dispatchEvaluateBatch({ requestKey: 'b-next', next: 3 });
+    assert.deepEqual(asked, [3]);
+    assert.deepEqual(
+      created.runs.map(run => run.jobId),
+      ['7'],
+    );
+    assert.deepEqual(created.skipped, [
+      { jobId: '404', reason: 'Job not found.' },
+      { jobId: '9', reason: 'No JD.' },
+    ]);
+    assert.equal(children.length, 1);
+  });
+});
+
+test('batch skips a job with an active run, and starts nothing when nothing is eligible', async () => {
+  await withRoot(async rootDir => {
+    const { service, children, store } = batchService(rootDir, {
+      actionsFor: async () => ({ base: {}, actions: {} }),
+    });
+    await service.dispatch({ action: 'evaluate', jobId: '2', requestKey: 's-2' });
+    const created = await service.dispatchEvaluateBatch({
+      requestKey: 'b-act',
+      jobIds: ['1', '2'],
+    });
+    assert.deepEqual(
+      created.runs.map(run => run.jobId),
+      ['1'],
+    );
+    assert.equal(created.skipped[0].jobId, '2');
+    assert.match(created.skipped[0].reason, /already active/);
+    const before = store.rows.size;
+    await assert.rejects(
+      service.dispatchEvaluateBatch({ requestKey: 'b-none', jobIds: ['2', '404'] }),
+      error => {
+        assert.equal(error.statusCode, 409);
+        assert.equal(error.publicCode, 'NO_ELIGIBLE_JOBS');
+        assert.equal(error.current.skipped.length, 2);
+        return true;
+      },
+    );
+    assert.equal(store.rows.size, before);
+    assert.equal(children.length, 2);
+  });
+});
+
+test('batch validation: exactly one of jobIds or next, bounds, uniqueness, extra fields', async () => {
+  await withRoot(async rootDir => {
+    const { service } = batchService(rootDir);
+    const bad = [
+      {},
+      { requestKey: 'k' },
+      { requestKey: 'k', jobIds: ['1'], next: 1 },
+      { requestKey: 'k', jobIds: [] },
+      { requestKey: 'k', jobIds: ['1', '1'] },
+      { requestKey: 'k', jobIds: ['01'] },
+      { requestKey: 'k', jobIds: Array.from({ length: 101 }, (_, i) => String(i + 1)) },
+      { requestKey: 'k', next: 0 },
+      { requestKey: 'k', next: 101 },
+      { requestKey: 'k', next: 1.5 },
+      { requestKey: 'bad key', next: 1 },
+      { requestKey: 'k', next: 1, extra: true },
+    ];
+    for (const body of bad)
+      await rejects(service.dispatchEvaluateBatch(body), 400, 'INVALID_REQUEST');
+  });
+});
+
+test('batch requestKey is idempotent: the replay returns the group and starts nothing', async () => {
+  await withRoot(async rootDir => {
+    const { service, children, store } = batchService(rootDir);
+    const first = await service.dispatchEvaluateBatch({ requestKey: 'b-idem', next: 2 });
+    const again = await service.dispatchEvaluateBatch({ requestKey: 'b-idem', next: 2 });
+    assert.equal(again.replayed, true);
+    assert.equal(again.groupId, first.groupId);
+    assert.deepEqual(
+      again.runs.map(run => run.id),
+      first.runs.map(run => run.id),
+    );
+    assert.equal(children.length, 2);
+    assert.equal(store.rows.size, 2);
+    // A key already used by a non-batch run is a conflict.
+    await service.dispatch({ action: 'cv', jobId: '3', requestKey: 'solo' });
+    await rejects(
+      service.dispatchEvaluateBatch({ requestKey: 'solo', next: 1 }),
+      409,
+      'REQUEST_KEY_CONFLICT',
+    );
+  });
+});
+
+test('cancel-queued interrupts waiting runs of the group, leaves running ones, and never starts them', async () => {
+  await withRoot(async rootDir => {
+    const { service, store, children } = batchService(rootDir, { batchConcurrency: 1 });
+    const created = await service.dispatchEvaluateBatch({ requestKey: 'b-cancel', next: 3 });
+    assert.deepEqual(
+      created.runs.map(run => run.state),
+      ['running', 'queued', 'queued'],
+    );
+    const result = await service.cancelQueued(created.groupId);
+    assert.deepEqual(result, { groupId: created.groupId, cancelled: 2 });
+    assert.equal(await stateOf(store, created.runs[0].id), 'running');
+    for (const run of created.runs.slice(1)) {
+      const row = await store.get(run.id);
+      assert.deepEqual([row.state, row.errorCode], ['interrupted', 'CANCELLED']);
+    }
+    await exitChild(children[0]);
+    assert.equal(children.length, 1, 'cancelled runs never start');
+    assert.equal((await service.cancelQueued(created.groupId)).cancelled, 0);
+    await rejects(service.cancelQueued('not-a-uuid'), 400, 'INVALID_REQUEST');
+    await rejects(service.cancelQueued('11111111-2222-4333-8444-555555555555'), 404, 'NOT_FOUND');
+  });
+});
+
+test('reconcile: a queued run waiting its turn is kept, an orphaned queued run is settled', async () => {
+  await withRoot(async rootDir => {
+    const { service, store, children } = batchService(rootDir, { batchConcurrency: 1 });
+    const created = await service.dispatchEvaluateBatch({ requestKey: 'b-rec', next: 2 });
+    const waiting = created.runs[1];
+    for (const run of created.runs)
+      store.rows.get(run.id).createdAt = new Date(Date.now() - 10 * 60_000).toISOString();
+    // An orphan: same group, queued, unknown to the in-memory table (as after a restart).
+    const orphan = await store.insert({
+      requestKey: 'b-rec:orphan',
+      groupId: created.groupId,
+      action: 'evaluate',
+      jobId: '9',
+      logRef: 'evaluate-9-orphan.log',
+    });
+    store.rows.get(orphan.id).createdAt = new Date(Date.now() - 10 * 60_000).toISOString();
+    const changed = await service.reconcile();
+    assert.deepEqual(
+      changed.map(run => [run.id, run.errorCode]),
+      [[orphan.id, 'QUEUE_STALE']],
+    );
+    assert.equal(await stateOf(store, waiting.id), 'queued');
+    await exitChild(children[0]);
+    assert.equal(await stateOf(store, waiting.id), 'running');
+    await exitChild(children[1]);
+  });
+});
+
+test('a batch run whose spawn fails frees its slot for the next one', async () => {
+  await withRoot(async rootDir => {
+    let calls = 0;
+    const fake = fakeSpawner();
+    const { service, store } = makeService(rootDir, {
+      batchConcurrency: 1,
+      spawn: (...args) => {
+        calls += 1;
+        if (calls === 1) throw new Error('boom');
+        return fake.spawn(...args);
+      },
+    });
+    const created = await service.dispatchEvaluateBatch({
+      requestKey: 'b-fail',
+      jobIds: ['1', '2'],
+    });
+    await until(async () => fake.children.length === 1, 'second run starts');
+    assert.equal(await stateOf(store, created.runs[0].id), 'failed');
+    await exitChild(fake.children[0]);
+  });
+});
+
+test('batch never runs two jobs of one company at once, even across batches', async () => {
+  await withRoot(async rootDir => {
+    const company = { 1: 'Acme Corp', 2: 'ACME  corp.', 3: 'Other Inc' };
+    const { service, store, children } = batchService(rootDir, {
+      batchConcurrency: 2,
+      findJob: async id => ({ id, status: 'Pending', company: company[id] }),
+    });
+    const created = await service.dispatchEvaluateBatch({
+      requestKey: 'b-co',
+      jobIds: ['1', '2', '3'],
+    });
+    // Job 2 shares Acme's slug with job 1, so it waits and the other company takes the slot.
+    assert.deepEqual(
+      created.runs.map(run => [run.jobId, run.state]),
+      [
+        ['1', 'running'],
+        ['2', 'queued'],
+        ['3', 'running'],
+      ],
+    );
+    assert.equal(children.length, 2);
+    const byJob = id => children.find(child => child.args.includes(`--job=${id}`));
+    await exitChild(byJob('3'));
+    assert.equal(children.length, 2, 'a free slot does not start a same-company run');
+    await exitChild(byJob('1'));
+    assert.equal(children.length, 3, 'the same-company run starts after the first exits');
+    assert.equal(await stateOf(store, created.runs[1].id), 'running');
+    await exitChild(byJob('2'));
+  });
+});
+
+test('a location review the worker reported (failed, LOCATION_REVIEW) is kept when the server sees the exit', async () => {
+  await withRoot(async rootDir => {
+    const { service, store, children } = batchService(rootDir);
+    const { runs } = await service.dispatchEvaluateBatch({ requestKey: 'loc-1', jobIds: ['1'] });
+    // The worker's own beforeExit report lands first; the exit observer must not overwrite it.
+    await store.finish(runs[0].id, 'failed', 2, 'LOCATION_REVIEW');
+    await exitChild(children[0], 2);
+    const row = await store.get(runs[0].id);
+    assert.deepEqual([row.state, row.exitCode, row.errorCode], ['failed', 2, 'LOCATION_REVIEW']);
+    // Without a worker report the exit observer records the generic code.
+    const other = await service.dispatchEvaluateBatch({ requestKey: 'loc-2', jobIds: ['2'] });
+    await exitChild(children[1], 2);
+    assert.equal((await store.get(other.runs[0].id)).errorCode, 'EXIT_NONZERO');
+  });
+});
+
+test('a running single evaluate holds a waiting batch run for the same company, and is never held itself', async () => {
+  await withRoot(async rootDir => {
+    const company = { 1: 'Acme', 2: 'Other', 3: 'acme' };
+    const { service, store, children } = batchService(rootDir, {
+      findJob: async id => ({ id, status: 'Pending', company: company[id] }),
+    });
+    const single = await service.dispatch({ action: 'evaluate', jobId: '1', requestKey: 's-co' });
+    assert.equal(single.runs[0].state, 'running');
+    const created = await service.dispatchEvaluateBatch({
+      requestKey: 'b-single',
+      jobIds: ['3', '2'],
+    });
+    // Job 3 shares Acme with the running single run, so it waits; the other company starts.
+    assert.deepEqual(
+      created.runs.map(run => [run.jobId, run.state]),
+      [
+        ['3', 'queued'],
+        ['2', 'running'],
+      ],
+    );
+    const byJob = id => children.find(child => child.args.includes(`--job=${id}`));
+    await exitChild(byJob('1'));
+    assert.equal(
+      await stateOf(store, created.runs[0].id),
+      'running',
+      'starts once the single exits',
+    );
+    await exitChild(byJob('3'));
+    await exitChild(byJob('2'));
+  });
+});
+
+test('liveness: argv for one job and for all, replay, conflicts and overlap rules', async () => {
+  await withRoot(async rootDir => {
+    process.env.SYNTH_MODE = 'ok';
+    const { service, store, spawned } = makeService(rootDir);
+    const one = await service.dispatch({ action: 'liveness', requestKey: 'lv-1', jobId: '7' });
+    assert.equal(one.replayed, false);
+    assert.deepEqual(
+      [one.runs[0].action, one.runs[0].jobId, one.runs[0].source],
+      ['liveness', '7', 'browser'],
+    );
+    assert.deepEqual(spawned[0][1], [join(rootDir, ...LAUNCHERS.liveness), '--job=7']);
+    assert.match(store.rows.get(one.runs[0].id).logRef, /^liveness-7-[0-9-]+-[0-9a-f]{8}\.log$/);
+    await until(
+      async () => (await store.get(one.runs[0].id)).state === 'completed',
+      'job check completion',
+    );
+    const replay = await service.dispatch({ action: 'liveness', requestKey: 'lv-1', jobId: '7' });
+    assert.equal(replay.replayed, true);
+    await rejects(
+      service.dispatch({ action: 'liveness', requestKey: 'lv-1', jobId: '8' }),
+      409,
+      'REQUEST_KEY_CONFLICT',
+    );
+    await rejects(
+      service.dispatch({ action: 'liveness', requestKey: 'lv-x', jobId: '404' }),
+      404,
+      'NOT_FOUND',
+    );
+
+    const all = await service.dispatch({ action: 'liveness', requestKey: 'lv-all' });
+    assert.equal(all.runs[0].jobId, null);
+    assert.deepEqual(spawned[1][1], [join(rootDir, ...LAUNCHERS.liveness), '--all']);
+    await until(
+      async () => (await store.get(all.runs[0].id)).state === 'completed',
+      'whole-board completion',
+    );
+
+    // A whole-board run never overlaps another one or a scan; a job run never overlaps a run of
+    // that job.
+    const active = await seedActive(store, 'liveness', 'running', null);
+    await rejects(service.dispatch({ action: 'liveness', requestKey: 'lv-2' }), 409, 'RUN_ACTIVE');
+    store.rows.get(active.id).state = 'completed';
+    const scan = await seedActive(store, 'scan', 'running', null);
+    await rejects(
+      service.dispatch({ action: 'liveness', requestKey: 'lv-3' }),
+      409,
+      'DISCOVERY_BUSY',
+    );
+    store.rows.get(scan.id).state = 'completed';
+    await seedActive(store, 'evaluate', 'running', '9');
+    await rejects(
+      service.dispatch({ action: 'liveness', requestKey: 'lv-4', jobId: '9' }),
+      409,
+      'RUN_ACTIVE',
+    );
+
+    for (const [body, field] of [
+      [{ action: 'liveness', requestKey: 'bad key' }, 'requestKey'],
+      [{ action: 'liveness', requestKey: 'v', jobId: '0' }, 'jobId'],
+      [{ action: 'liveness', requestKey: 'v', jobId: 7 }, 'jobId'],
+      [{ action: 'liveness', requestKey: 'v', dryRun: true }, 'dryRun'],
+    ])
+      await rejects(service.dispatch(body), 400, 'INVALID_REQUEST', field);
+  });
+});
+
+test('a scan is refused while a whole-board posting check is active, but not for a single-job check', async () => {
+  await withRoot(async rootDir => {
+    process.env.SYNTH_MODE = 'ok';
+    const { service, store } = makeService(rootDir);
+    const single = await seedActive(store, 'liveness', 'running', '7');
+    const scanOk = await service.dispatch({ action: 'scan', requestKey: 'scan-ok', dryRun: true });
+    assert.equal(scanOk.replayed, false);
+    await until(
+      async () => (await store.get(scanOk.runs[0].id)).state === 'completed',
+      'scan completion',
+    );
+    store.rows.get(single.id).state = 'completed';
+    const whole = await seedActive(store, 'liveness', 'running', null);
+    await assert.rejects(
+      service.dispatch({ action: 'scan', requestKey: 'scan-busy', dryRun: true }),
+      error => {
+        assert.equal(error.statusCode, 409);
+        assert.equal(error.publicCode, 'DISCOVERY_BUSY');
+        assert.equal(error.current.activeRunId, whole.id);
+        return true;
+      },
+    );
+    store.rows.get(whole.id).state = 'completed';
+  });
 });

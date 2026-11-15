@@ -4,6 +4,9 @@ import { createApp } from './app.mjs';
 import { fetchAtsJobPosting } from '../scan/providers/_canonical-jd.mjs';
 import { createIntakeFetchService, extractJobFields, isPrivateAddress } from './intake-fetch.mjs';
 
+// Test guard: a test never reaches the configured database (see src/lib/_database.mjs).
+process.env.CAREER_OPS_TEST_GUARD = '1';
+
 // Mocked HTTP only: no live request, no real DNS, no real key.
 
 const SECRET = 'fc-test-secret-key-0123456789';

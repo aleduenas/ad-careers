@@ -8,6 +8,9 @@ import { createServer } from 'node:net';
 import { startService, parsePort, locateNpmCli } from './start.mjs';
 import { DatabaseUnavailableError } from './readiness.mjs';
 
+// Test guard: a test never reaches the configured database (see src/lib/_database.mjs).
+process.env.CAREER_OPS_TEST_GUARD = '1';
+
 async function createOwnedTemp(prefix) {
   const created = await mkdtemp(join(tmpdir(), prefix));
   const absolute = resolve(created);

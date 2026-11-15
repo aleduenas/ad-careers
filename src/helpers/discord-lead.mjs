@@ -39,7 +39,7 @@ const base = join(root, 'logs/dev-discord-lead');
 const configPath = join(root, 'config/discord-lead.json');
 const statePath = join(base, 'session.json');
 const lockPath = join(base, 'bridge.lock');
-const promptPath = join(root, 'documentation/dashboard-migration/DISCORD_LEAD_PROMPT.md');
+const promptPath = join(root, 'notes/dashboard-migration/DISCORD_LEAD_PROMPT.md');
 
 export class LeadBridge {
   constructor({

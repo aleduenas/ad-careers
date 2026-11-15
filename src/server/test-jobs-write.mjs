@@ -9,6 +9,9 @@ import { urlKey } from '../lib/_database.mjs';
 import { createJobsWrite, MAX_JD_BYTES, writeJdCache } from './jobs-write.mjs';
 import { DatabaseUnavailableError, SchemaNotReadyError } from './readiness.mjs';
 
+// Test guard: a test never reaches the configured database (see src/lib/_database.mjs).
+process.env.CAREER_OPS_TEST_GUARD = '1';
+
 const sha = text => createHash('sha256').update(text).digest('hex');
 
 function fakeJob(overrides = {}) {
@@ -707,5 +710,75 @@ test('metadata: url edit is refused when another job holds the URL under an olde
     field: 'url',
     expectedValue: null,
     value: 'https://x.example/own',
+  });
+});
+
+test('D114 setFavorite updates only the flag, is idempotent, validates and maps unknown jobs to 404', async () => {
+  const calls = [];
+  const query = async (sql, args) => {
+    calls.push([sql, args]);
+    return args[0] === '404' ? [] : [{ id: args[0], favorite: args[1] }];
+  };
+  const { writer } = makeWriter({ query });
+  assert.deepEqual(await writer.setFavorite('7', { favorite: true }), { id: '7', favorite: true });
+  assert.deepEqual(await writer.setFavorite('7', { favorite: true }), { id: '7', favorite: true });
+  assert.deepEqual(await writer.setFavorite('7', { favorite: false }), {
+    id: '7',
+    favorite: false,
+  });
+  for (const [sql] of calls) {
+    assert.match(sql, /^UPDATE jobs SET favorite = \$2 WHERE id = \$1::bigint/);
+    assert.doesNotMatch(sql, /revision|change_job_status|job_status_events/);
+  }
+  await assert.rejects(writer.setFavorite('404', { favorite: true }), { statusCode: 404 });
+  for (const [id, body] of [
+    ['abc', { favorite: true }],
+    ['7', {}],
+    ['7', { favorite: 'true' }],
+    ['7', { favorite: true, status: 'Offer' }],
+  ])
+    await assert.rejects(writer.setFavorite(id, body), { statusCode: 400 });
+});
+
+test('D116 jd save refreshes the years-of-experience estimate after the commit and never fails the edit', async () => {
+  await withRoot(async root => {
+    const state = { job: { id: '7', jd_path: null, role: 'Senior Engineer' } };
+    const stored = [];
+    const { writer, calls } = makeWriter({
+      state,
+      root,
+      query: async (sql, args) => {
+        calls.push(['q', sql, args]);
+        if (/UPDATE job_descriptions SET yoe_min/.test(sql)) stored.push(args);
+        return [{ id: '7' }];
+      },
+    });
+    const result = await writer.saveJd('7', jd({ text: 'You need 6+ years of experience.' }));
+    assert.deepEqual(stored, [['7', 6, 'high']]);
+    // The estimate is written outside the transaction, after the sync.
+    const order = calls.map(call => (/sync_job_description/.test(call[1]) ? 'sync' : call[0]));
+    assert.ok(order.indexOf('sync') < order.lastIndexOf('q'));
+    // Unchanged text does not re-estimate.
+    stored.length = 0;
+    await writer.saveJd('7', {
+      expectedRevision: result.jd.revision,
+      expectedHash: result.jd.contentHash,
+      text: result.jd.text,
+    });
+    assert.deepEqual(stored, []);
+  });
+  // A failing estimate write leaves the edit successful.
+  await withRoot(async root => {
+    const state = {};
+    const { writer } = makeWriter({
+      state,
+      root,
+      query: async () => {
+        throw new Error('column does not exist');
+      },
+    });
+    const result = await writer.saveJd('7', jd());
+    assert.equal(result.jd.revision, '1');
+    assert.equal(result.cacheSync, 'ok');
   });
 });

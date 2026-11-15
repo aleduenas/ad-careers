@@ -1,0 +1,61 @@
+/* The service page. */
+
+.connection-summary {
+  margin-top: 34px;
+}
+
+.connection-summary > .section-heading {
+  margin-bottom: 14px;
+}
+
+.service-page {
+  display: grid;
+  gap: 16px;
+}
+
+.service-page h2 {
+  margin: 0 0 12px;
+  font-size: 17px;
+}
+
+.service-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 14px 24px;
+  margin: 0;
+}
+
+.service-facts dt {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.service-facts dd {
+  margin: 2px 0 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.service-table {
+  width: 100%;
+  min-width: 560px;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 13px;
+}
+
+.service-table th,
+.service-table td {
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  font-weight: 500;
+}
+
+.service-table thead th {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.service-table tbody tr:last-child > * {
+  border-bottom: 0;
+}

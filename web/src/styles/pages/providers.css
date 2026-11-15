@@ -1,0 +1,55 @@
+/* The providers page. */
+
+/* Package 3.7: Providers page */
+.providers-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+.provider-list,
+.readiness-list {
+  display: grid;
+  gap: 14px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.provider-row,
+.readiness-row {
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.provider-row-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 14px;
+}
+
+.source-badge,
+.readiness-badge {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  padding: 3px 10px;
+  border: 1px solid var(--green);
+  border-radius: 999px;
+  background: var(--green-bg);
+  color: var(--green);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.source-badge.is-legacy,
+.readiness-unknown {
+  border-color: var(--line);
+  background: var(--paper-soft);
+  color: var(--muted);
+}

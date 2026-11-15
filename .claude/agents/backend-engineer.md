@@ -12,7 +12,7 @@ Node ESM server under `src/server/` that the browser talks to.
 
 ## Read first
 
-`AGENTS.md`, your package brief from the lead, `documentation/dashboard-migration/design/API.md`
+`AGENTS.md`, your package brief from the lead, `notes/dashboard-migration/design/API.md`
 and the contract the lead names (for example `design/STAGE2_READ_CONTRACT.md`). Read the Go code
 in `dashboard/` for the exact behavior you are porting; do not guess from the TUI README.
 
@@ -27,8 +27,9 @@ in `dashboard/` for the exact behavior you are porting; do not guess from the TU
   changes shared schemas; ask first.
 - Serve on loopback with the existing Host/Origin checks. Never return private paths, raw driver
   errors, candidate configuration or secrets.
-- Every `.mjs` file you add or change gets its mirrored page under `documentation/src/server/`
-  and a `test-*.mjs` beside it. Run `npx prettier --write` on changed files.
+- Documentation follows `AGENTS.md` rule 9 (one concise README per folder; no new per-file
+  pages; smallest edit to existing pages until the folder is converted). Every `.mjs` file you
+  add gets a `test-*.mjs` beside it. Run `npx prettier --write` on changed files.
 - Database-backed tests use `node src/helpers/db-test.mjs` (isolated `career_ops_test_`), never
   the personal database. Report skipped integration checks as skipped.
 

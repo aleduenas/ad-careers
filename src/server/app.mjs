@@ -11,6 +11,7 @@ import { createIntakeFetchService } from './intake-fetch.mjs';
 import { createProvidersService } from './providers.mjs';
 import { createJobsWrite, MAX_JD_BYTES } from './jobs-write.mjs';
 import { createGhosting } from './ghosting.mjs';
+import { createLiveness } from './liveness.mjs';
 import { createCostService, normalizeCostQuery } from './cost.mjs';
 import { createLetterService } from './letter.mjs';
 
@@ -18,6 +19,9 @@ const DEFAULT_HOST = '127.0.0.1:4310';
 const DEFAULT_ORIGIN = 'http://127.0.0.1:4310';
 const DEVELOPMENT_ORIGIN = 'http://127.0.0.1:5173';
 const API_PREFIX = '/api/v1';
+// The daily posting check changes job statuses by itself, so its timer is off by default
+// (summary and run routes stay registered). Off until the D117 review passes (lead flips it).
+export const LIVENESS_DAILY_ENABLED = false;
 const BODY_LIMIT = 1024 * 1024;
 
 function apiError(statusCode, code, message, retryable = false) {
@@ -117,6 +121,7 @@ export function createApp({
   runsService: injectedRunsService,
   jobsWriter: injectedWriter,
   ghosting: injectedGhosting,
+  livenessService: injectedLiveness,
   intakeService: injectedIntake,
   intakeFetchService: injectedIntakeFetch,
   providersService: injectedProviders,
@@ -242,6 +247,22 @@ export function createApp({
         ? createGhosting()
         : null
       : injectedGhosting;
+  // Posting check summary and its daily run (D117). The summary needs the real database; the daily
+  // timer exists only where the ghosting timer does (never in tests or fixture servers).
+  const livenessService =
+    injectedLiveness === undefined
+      ? readiness === checkReadiness && runsService
+        ? createLiveness({
+            dispatch: input => runsService.dispatch(input),
+            activeScan: async () => (await runsService.activeScan?.()) ?? null,
+            daily:
+              LIVENESS_DAILY_ENABLED &&
+              !injectedJobsReader &&
+              !injectedDetailReader &&
+              injectedRunsService === undefined,
+          })
+        : null
+      : injectedLiveness;
   // One truth for the session and /ready: a run service exists and its migration is applied.
   const taskDispatchStatus = async () => {
     if (!runsService) return { ready: false, reason: 'notConfigured' };
@@ -261,7 +282,11 @@ export function createApp({
       return sendError(reply, request.requestId, error.statusCode, error.publicCode, error.message);
     }
     const requestPath = request.url.split('?', 1)[0];
-    const isRunPost = request.method === 'POST' && requestPath === `${API_PREFIX}/runs`;
+    const isRunPost =
+      request.method === 'POST' &&
+      (requestPath === `${API_PREFIX}/runs` ||
+        requestPath === `${API_PREFIX}/runs/evaluate-batch` ||
+        /^\/api\/v1\/runs\/groups\/[^/]+\/cancel-queued$/.test(requestPath));
     if (
       isRunPost ||
       isJobWrite(request.method, requestPath) ||
@@ -284,10 +309,13 @@ export function createApp({
   app.addHook('onListen', async () => {
     if (runsService && injectedRunsService === undefined) runsService.start();
     if (ghosting && injectedGhosting === undefined) ghosting.start();
+    if (LIVENESS_DAILY_ENABLED && livenessService && injectedLiveness === undefined)
+      livenessService.start();
   });
   app.addHook('onClose', async () => {
     runsService?.stop?.();
     ghosting?.stop?.();
+    livenessService?.stop?.();
   });
   if (readiness === checkReadiness || !injectedJobsReader || !injectedDetailReader)
     app.addHook('onClose', async () => closeResources());
@@ -306,7 +334,10 @@ export function createApp({
         path === `${API_PREFIX}/cost/calls` ||
         /^\/api\/v1\/runs\/[^/]+\/log$/.test(path));
     const bodyAllowed =
-      (request.method === 'POST' && path === `${API_PREFIX}/runs`) ||
+      (request.method === 'POST' &&
+        (path === `${API_PREFIX}/runs` ||
+          path === `${API_PREFIX}/runs/evaluate-batch` ||
+          /^\/api\/v1\/runs\/groups\/[^/]+\/cancel-queued$/.test(path))) ||
       isJobWrite(request.method, path) ||
       isIntakePost(request.method, path) ||
       isProvidersWrite(request.method, path);
@@ -336,6 +367,10 @@ export function createApp({
       'scoreMin',
       'scoreMax',
       'addedWeek',
+      'favorite',
+      'yoeMax',
+      'yoeUnknown',
+      'posting',
     ]);
     for (const [key, value] of params) {
       if (!allowed.has(key)) throw apiError(400, 'INVALID_REQUEST', 'Query parameter is invalid.');
@@ -477,6 +512,23 @@ export function createApp({
   writeRoute('POST', 'status', 16 * 1024, 'changeStatus', publicSchemas.JobWriteResponse);
   writeRoute('PATCH', 'metadata', 16 * 1024, 'updateMetadata', publicSchemas.JobWriteResponse);
   writeRoute('PUT', 'jd', MAX_JD_BYTES * 2, 'saveJd', publicSchemas.JobJdWriteResponse);
+  app.put(
+    `${API_PREFIX}/jobs/:id/favorite`,
+    {
+      bodyLimit: 1024,
+      schema: {
+        body: publicSchemas.JobFavoriteRequest,
+        response: { 200: publicSchemas.JobFavoriteResponse },
+      },
+    },
+    async request => {
+      if (!jobsWriter) throw writesUnavailable();
+      return {
+        data: await jobsWriter.setFavorite(request.params.id, request.body),
+        meta: { requestId: request.requestId, observedAt: new Date().toISOString() },
+      };
+    },
+  );
 
   // Letter editing (STAGE3_LETTER_CONTRACT.md). Both routes exist only when a letter service does;
   // the PUT is a session-guarded write. 256 KB of text can reach 1.5 MB when JSON-escaped.
@@ -545,6 +597,54 @@ export function createApp({
       reply.code(result.replayed ? 200 : 201);
       return {
         data: result,
+        meta: { requestId: request.requestId, observedAt: new Date().toISOString() },
+      };
+    },
+  );
+
+  // Posting check summary: whether a check is running and the newest completed whole-board run.
+  app.get(
+    `${API_PREFIX}/liveness/summary`,
+    { schema: { response: { 200: publicSchemas.LivenessSummaryResponse } } },
+    async request => ({
+      data: livenessService
+        ? await livenessService.summary()
+        : { running: false, lastFullCheck: null },
+      meta: { requestId: request.requestId, observedAt: new Date().toISOString() },
+    }),
+  );
+
+  app.post(
+    `${API_PREFIX}/runs/evaluate-batch`,
+    {
+      schema: {
+        body: publicSchemas.RunBatchRequest,
+        response: { 200: publicSchemas.RunBatchResponse, 201: publicSchemas.RunBatchResponse },
+      },
+    },
+    async (request, reply) => {
+      if (!runsService?.dispatchEvaluateBatch) throw tasksUnavailable();
+      const result = await runsService.dispatchEvaluateBatch(request.body);
+      reply.code(result.replayed ? 200 : 201);
+      return {
+        data: result,
+        meta: { requestId: request.requestId, observedAt: new Date().toISOString() },
+      };
+    },
+  );
+
+  app.post(
+    `${API_PREFIX}/runs/groups/:groupId/cancel-queued`,
+    {
+      schema: {
+        body: publicSchemas.RunCancelQueuedRequest,
+        response: { 200: publicSchemas.RunCancelQueuedResponse },
+      },
+    },
+    async request => {
+      if (!runsService?.cancelQueued) throw tasksUnavailable();
+      return {
+        data: await runsService.cancelQueued(request.params.groupId),
         meta: { requestId: request.requestId, observedAt: new Date().toISOString() },
       };
     },
@@ -822,7 +922,7 @@ function isJobWrite(method, path) {
   return (
     (method === 'POST' && /^\/api\/v1\/jobs\/[^/]+\/status$/.test(path)) ||
     (method === 'PATCH' && /^\/api\/v1\/jobs\/[^/]+\/metadata$/.test(path)) ||
-    (method === 'PUT' && /^\/api\/v1\/jobs\/[^/]+\/(?:jd|letter)$/.test(path))
+    (method === 'PUT' && /^\/api\/v1\/jobs\/[^/]+\/(?:jd|letter|favorite)$/.test(path))
   );
 }
 

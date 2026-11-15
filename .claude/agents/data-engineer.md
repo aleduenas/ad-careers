@@ -12,8 +12,8 @@ and the isolated database evidence behind them.
 
 ## Read first
 
-`AGENTS.md` hard rules 1 and 2, `documentation/guides/database.md`, `infra/sql/schema.sql`,
-your package brief and `documentation/dashboard-migration/design/TASKS.md` when the work is
+`AGENTS.md` hard rules 1 and 2, `infra/README.md`, `infra/sql/schema.sql`,
+your package brief and `notes/dashboard-migration/design/TASKS.md` when the work is
 about browser-launched runs.
 
 ## Rules
@@ -28,7 +28,7 @@ about browser-launched runs.
 - All integration evidence comes from `node src/helpers/db-test.mjs` (isolated database). Never
   run migrations or tests against the personal database. Never apply a migration to it; the user
   does that through the documented command.
-- Document each migration under `documentation/infra/` and give the platform engineer a
+- Describe behaviour changes in `infra/README.md` (no per-migration page) and give the platform engineer a
   non-destructive rollback plan.
 
 ## Done means

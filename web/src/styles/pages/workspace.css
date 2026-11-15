@@ -1,0 +1,804 @@
+/* The workspace page. */
+
+.dialog-close {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  width: 36px;
+  min-height: 36px;
+  padding: 4px;
+  border-color: transparent;
+  background: transparent;
+  color: var(--muted);
+  font-size: 20px;
+}
+
+.back-link {
+  width: fit-content;
+  font-weight: 600;
+}
+
+.pane-tabs {
+  display: none;
+  gap: 8px;
+}
+
+.doc-pane,
+.workspace-section {
+  min-width: 0;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+.doc-pane h3,
+.workspace-section h3 {
+  margin: 0 0 10px;
+}
+
+.notes-text {
+  max-height: 40vh;
+}
+
+@media (max-width: 1023px) {
+  .pane-tabs {
+    display: flex;
+  }
+
+  .doc-pane[data-active='false'] {
+    display: none;
+  }
+}
+
+.back-link,
+.file-list a {
+  color: var(--green);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+/* Package 3.2: workspace editing */
+.edit-grid-outer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 18px;
+}
+
+.edit-card h3 {
+  margin: 0 0 10px;
+}
+
+.edit-row {
+  max-width: 320px;
+}
+
+.edit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 18px 22px;
+}
+
+.edit-field {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  min-width: 0;
+}
+
+.edit-field-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.edit-label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.edit-value,
+.edit-field .missing-copy {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.edit-pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.jd-editor {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.conflict-text {
+  max-height: 30vh;
+  margin-top: 8px;
+}
+
+.doc-pane .edit-actions {
+  margin-top: 10px;
+}
+
+@media (min-width: 1024px) {
+  .edit-grid-outer {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 2fr);
+    align-items: start;
+  }
+}
+
+/* Package 3.4: workspace actions and run cards */
+.action-bar {
+  display: grid;
+  gap: 12px;
+}
+
+.action-bar h3,
+.action-bar p {
+  margin: 0;
+}
+
+.action-buttons {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 12px 16px;
+}
+
+.action-item {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+}
+
+.action-item .quiet-button {
+  width: 100%;
+}
+
+.action-reason {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.run-cards {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Package 3.5: cover-letter editor and PDF line. */
+.letter-section {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.letter-section h4 {
+  margin: 0;
+}
+
+.letter-pdf {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 0;
+}
+
+.letter-pdf span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.file-list a,
+.back-link {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+}
+
+.report-prose > :first-child {
+  margin-top: 0;
+}
+
+.report-prose a {
+  color: var(--green);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.action-bar {
+  gap: 8px;
+}
+
+.action-buttons {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px 12px;
+}
+
+/* Package 4.3 F11 (D067): full-page workspace without cards. */
+.ws-plain {
+  display: grid;
+  gap: 18px;
+  padding: 24px 28px;
+}
+
+.ws-bar {
+  display: grid;
+  gap: 8px;
+  padding: 12px 24px 10px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.ws-bar-main,
+.ws-bar-bare {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+
+.ws-bar-bare {
+  padding: 12px 24px;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.ws-bar h1 {
+  margin: 0;
+  min-width: 0;
+  flex: 1 1 260px;
+  font-size: 20px;
+  line-height: 1.25;
+  overflow-wrap: anywhere;
+}
+
+.ws-chrome {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.ws-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 22px;
+  margin: 0;
+}
+
+.ws-facts > div {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ws-facts dt,
+.ws-materials span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.ws-facts dd {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.ws-facts small {
+  display: block;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.ws-facts a,
+.ws-materials a {
+  color: var(--green);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ws-materials {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 22px;
+  font-size: 13px;
+}
+
+.ws-materials > div {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+
+.ws-material-button {
+  min-height: 28px;
+  padding: 2px 10px;
+  font-size: 12px;
+}
+
+.ws-material-reason {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+.ws-materials em {
+  color: var(--muted);
+  font-style: normal;
+}
+
+.ws-body {
+  display: block;
+}
+
+.ws-center {
+  min-width: 0;
+}
+
+.ws-split {
+  display: block;
+}
+
+.ws-divider {
+  display: none;
+}
+
+.ws .doc-pane {
+  padding: 14px 24px 24px;
+}
+
+.ws .doc-pane h3 {
+  margin-top: 0;
+}
+
+.ws-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.ws-rail-button {
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.ws-rail-button:hover {
+  background: var(--paper-soft);
+}
+
+.ws-rail-button[aria-expanded='true'] {
+  border-color: var(--green);
+  background: var(--green-bg);
+  color: var(--green);
+  font-weight: 700;
+}
+
+.ws-section {
+  display: grid;
+  gap: 10px;
+}
+
+@media (min-width: 1024px) {
+  .workspace.ws {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .ws-body {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+  }
+
+  .ws-center {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+    flex-direction: column;
+  }
+
+  .ws-split {
+    display: flex;
+    min-height: 0;
+    flex: 1;
+  }
+
+  .ws-split > .doc-pane {
+    min-width: 0;
+    overflow: auto;
+  }
+
+  .ws-split > .doc-pane:first-child {
+    flex: 0 0 calc(var(--ws-left, 50%) - 4px);
+  }
+
+  .ws-split > .doc-pane:last-child {
+    flex: 1 1 0;
+  }
+
+  .ws-divider {
+    display: block;
+    flex: 0 0 8px;
+    cursor: col-resize;
+    background: var(--line);
+    touch-action: none;
+  }
+
+  .ws-divider:hover,
+  .ws-divider:focus-visible {
+    background: var(--green);
+  }
+
+  .ws-rail {
+    flex: 0 0 68px;
+    flex-direction: column;
+    flex-wrap: nowrap;
+    gap: 6px;
+    padding: 10px 6px;
+    border-bottom: 0;
+    border-left: 1px solid var(--line);
+    background: var(--paper);
+  }
+
+  .ws-rail-button {
+    flex-direction: column;
+    gap: 2px;
+    padding: 8px 2px;
+    font-size: 11px;
+  }
+}
+
+@media (max-width: 1023px) {
+  /* Below 1024 px the tool rail is a bar fixed to the bottom of the viewport. */
+  .workspace.ws {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .ws-rail {
+    position: fixed;
+    z-index: 30;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    flex-wrap: nowrap;
+    gap: 8px;
+    padding: 8px 12px calc(8px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--line);
+    border-bottom: 0;
+    background: var(--paper);
+  }
+
+  .ws-rail-button {
+    min-width: 0;
+    flex: 1 1 0;
+    justify-content: center;
+    padding: 6px 4px;
+  }
+}
+
+@media (min-width: 701px) and (max-width: 1023px) {
+  .ws-rail {
+    left: 56px;
+  }
+}
+
+.ws-bar {
+  gap: 0;
+  padding: 18px max(var(--gutter), calc((100% - var(--content-max)) / 2)) 0;
+}
+
+.ws-bar-main {
+  padding-bottom: 16px;
+}
+
+.ws-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 36px;
+  padding: 12px 0 14px;
+  border-top: 1px solid var(--line);
+}
+
+.ws-bar-bare {
+  padding-right: var(--gutter);
+  padding-left: var(--gutter);
+}
+
+.ws-rail {
+  padding-right: var(--gutter);
+  padding-left: var(--gutter);
+}
+
+.ws .doc-pane {
+  padding: 22px var(--pane-pad, 28px) 40px;
+}
+
+.ws .doc-text {
+  max-width: 80ch;
+  line-height: 1.65;
+}
+
+.ws-plain {
+  padding-right: var(--gutter);
+  padding-left: var(--gutter);
+}
+
+@media (min-width: 1024px) {
+  .ws-split {
+    width: 100%;
+    max-width: var(--content-max);
+    margin-inline: auto;
+    padding-inline: max(0px, calc(var(--gutter) - 28px));
+    --pane-pad: 28px;
+  }
+
+  .ws-rail {
+    padding-right: 6px;
+    padding-left: 6px;
+  }
+}
+
+.ws-bar-bare {
+  padding-bottom: 14px;
+}
+
+.report-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+/* Package 4.3 F17: surfaces on a different page colour. The bar, both panes, the tool rail, the
+   slide-outs and the Jobs list are paper; everything between them is the page. */
+.ws .doc-pane {
+  margin: 12px var(--gutter);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+}
+
+@media (min-width: 1024px) {
+  .ws-split {
+    max-width: var(--content-max);
+    margin-inline: auto;
+    padding: 16px 0;
+  }
+
+  .ws-split > .doc-pane {
+    margin: 0;
+  }
+
+  .ws-split > .doc-pane:first-child {
+    flex: 0 0 calc(var(--ws-left, 50%) - 4px - var(--gutter));
+    margin-left: var(--gutter);
+  }
+
+  .ws-split > .doc-pane:last-child {
+    flex: 1 1 0;
+    margin-right: var(--gutter);
+  }
+
+  .ws-divider {
+    background: transparent;
+    position: relative;
+  }
+
+  .ws-divider::after {
+    content: '';
+    position: absolute;
+    inset: 0 3px;
+    border-radius: 2px;
+    background: var(--line);
+  }
+
+  .ws-divider:hover::after,
+  .ws-divider:focus-visible::after {
+    background: var(--green);
+  }
+}
+
+.ws .doc-pane {
+  margin: 0 var(--gutter);
+  padding: 0 var(--pane-pad, 28px);
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: var(--paper);
+}
+
+.ws .doc-pane > h3 {
+  margin: 0;
+  padding: 0 0 10px;
+}
+
+@media (min-width: 1024px) {
+  .ws-split {
+    padding: 0;
+  }
+
+  .ws-split > .doc-pane {
+    margin: 0;
+  }
+
+  .ws-split > .doc-pane:first-child {
+    margin-left: var(--gutter);
+  }
+
+  .ws-split > .doc-pane:last-child {
+    margin-right: var(--gutter);
+  }
+}
+
+/* Package 4.3 F30: pane titles are a shaded header strip across the pane, sticky while it scrolls. */
+.ws .doc-pane > h3 {
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  margin: 0 calc(-1 * var(--pane-pad, 28px));
+  padding: 12px var(--pane-pad, 28px);
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-soft);
+}
+
+.ws .doc-pane > h3 + * {
+  margin-top: 16px;
+}
+
+.ws-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Package 4.3 F34: a primary action button with a smaller "with model" companion. */
+.action-pair {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.action-with-model {
+  min-height: 30px;
+  padding: 3px 10px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+/* Package 4.3 F39: the cover letter opens in a centered plain-text editor. */
+.ws-material-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--green);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.letter-modal {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(780px, calc(100vw - 32px));
+  max-height: calc(100dvh - 32px);
+  padding: 18px 22px;
+}
+
+.letter-modal:not([open]) {
+  display: none;
+}
+
+.letter-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.letter-modal-head h2 {
+  margin: 0;
+  padding-right: 40px;
+  font-size: 18px;
+}
+
+.letter-modal .dialog-close {
+  top: 12px;
+  right: 14px;
+}
+
+.letter-modal .letter-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.letter-modal .doc-edit {
+  min-height: min(58dvh, 560px);
+  padding: 14px 16px;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.65;
+  resize: vertical;
+}
+
+.letter-modal-read {
+  max-height: 58dvh;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 15px;
+  line-height: 1.65;
+}
+
+.letter-modal-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.letter-modal-file {
+  margin-left: auto;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 600px) {
+  .letter-modal {
+    top: 0;
+    left: 0;
+    width: 100vw;
+    max-width: none;
+    height: 100dvh;
+    max-height: none;
+    padding: 14px 16px;
+    transform: none;
+    border-radius: 0;
+  }
+
+  .letter-modal .doc-edit {
+    min-height: 50dvh;
+    flex: 1 1 auto;
+  }
+}

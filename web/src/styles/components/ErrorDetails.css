@@ -1,0 +1,17 @@
+/* The ErrorDetails component. */
+
+.error-details {
+  display: grid;
+  gap: 2px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.error-details summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.error-details > span {
+  display: block;
+}

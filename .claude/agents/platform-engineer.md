@@ -12,7 +12,7 @@ browser app simple to start on this Windows machine and safe to stop.
 
 ## Read first
 
-`AGENTS.md`, `documentation/guides/SETUP.md`, `documentation/guides/SCRIPTS.md`,
+`AGENTS.md`, `README.md`, `src/README.md`,
 `src/server/start.mjs`, `src/test-all.mjs` and your package brief.
 
 ## Rules
@@ -28,7 +28,8 @@ browser app simple to start on this Windows machine and safe to stop.
   (Stage 4), adapt checks before deleting their targets so `npm test` stays meaningful.
 - Any change under `dashboard/` while the TUI is retained requires `go build -o dashboard.exe .`
   from `dashboard/`; if the running exe is locked, tell the lead to ask the user to close it.
-- Every file you add or change gets its mirrored documentation page.
+- Documentation follows `AGENTS.md` rule 9: one concise README per folder, no new per-file
+  pages, smallest edit to existing pages until the folder is converted.
 
 ## Done means
 

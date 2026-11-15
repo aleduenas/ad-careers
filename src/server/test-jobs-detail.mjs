@@ -6,6 +6,9 @@ import test from 'node:test';
 import { createJobsDetail, jobDetailSql } from './jobs-detail.mjs';
 import { DatabaseUnavailableError, SchemaNotReadyError } from './readiness.mjs';
 
+// Test guard: a test never reaches the configured database (see src/lib/_database.mjs).
+process.env.CAREER_OPS_TEST_GUARD = '1';
+
 const STATUSES = ['Pending', 'Evaluated', 'Applied', 'Interview', 'Offer', 'Rejected', 'Discarded'];
 
 function jobRow(overrides = {}) {
@@ -40,6 +43,10 @@ function makeQuery(data = {}) {
     if (sql === jobDetailSql.job) return (data.jobs || []).filter(row => row.id === id);
     if (sql === jobDetailSql.jd) return (data.jd || {})[id] ? [data.jd[id]] : [];
     if (sql === jobDetailSql.evaluations) return (data.evaluations || {})[id] || [];
+    if (sql === jobDetailSql.posting) {
+      if (data.postingFail) throw new Error('relation "posting_checks" does not exist');
+      return (data.posting || {})[id] || [];
+    }
     if (sql === jobDetailSql.events) return (data.events || {})[id] || [];
     if (sql === jobDetailSql.activeRuns) {
       if (data.activeFail) throw new Error('relation "browser_runs" does not exist');
@@ -490,7 +497,7 @@ test('database failures map to safe public errors and leak no driver text', asyn
 test('detail issues only SELECT statements with the id as a bound parameter', async () => {
   await withDetail({ jobs: [jobRow()] }, async (reader, { calls }) => {
     await reader.detail('1');
-    assert.equal(calls.length, 5);
+    assert.equal(calls.length, 6);
     for (const [sql, args] of calls) {
       assert.match(sql, /^\s*SELECT\b/i);
       assert.deepEqual(args, ['1']);
@@ -763,4 +770,34 @@ test('actions.publish: needs an editable cover-letter.md; an active publish or l
     'No cover letter to publish.',
     'a missing letter beats the active-run reason',
   );
+});
+
+test('detail carries the latest posting check, and none when the table is unavailable', async () => {
+  const checked = new Date('2026-11-14T10:00:00Z');
+  const posting = {
+    1: [
+      {
+        state: 'closed',
+        action: 'discarded',
+        method: 'greenhouse',
+        detail: 'The job board answered 404.',
+        checked_at: checked,
+      },
+    ],
+  };
+  await withDetail({ jobs: [jobRow()], posting }, async reader => {
+    assert.deepEqual((await reader.detail('1')).job.posting, {
+      state: 'closed',
+      action: 'discarded',
+      checkedAt: checked.toISOString(),
+      method: 'greenhouse',
+      detail: 'The job board answered 404.',
+    });
+  });
+  await withDetail({ jobs: [jobRow()] }, async reader => {
+    assert.equal((await reader.detail('1')).job.posting, null);
+  });
+  await withDetail({ jobs: [jobRow()], postingFail: true }, async reader => {
+    assert.equal((await reader.detail('1')).job.posting, null);
+  });
 });

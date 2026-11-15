@@ -119,6 +119,13 @@ export function createRunsStore({ query }) {
         )
       ).map(toRun);
     },
+    listByGroup: async groupId =>
+      (
+        await rows(
+          'SELECT ' + COLUMNS + ' FROM browser_runs WHERE group_id=$1 ORDER BY created_at,id',
+          [groupId],
+        )
+      ).map(toRun),
     get: id => one('SELECT ' + COLUMNS + ' FROM browser_runs WHERE id=$1', [id]),
     getByRequestKey: requestKey =>
       one('SELECT ' + COLUMNS + ' FROM browser_runs WHERE request_key=$1', [requestKey]),

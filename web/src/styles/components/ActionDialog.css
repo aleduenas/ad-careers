@@ -1,0 +1,60 @@
+/* The ActionDialog component. */
+
+.action-functions {
+  display: grid;
+  gap: 14px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.action-function {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+
+.action-function > div:first-child {
+  display: grid;
+  gap: 2px;
+}
+
+.action-function label {
+  display: grid;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.action-function label.checkbox-control {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.action-function label.checkbox-control input {
+  width: auto;
+  min-height: 0;
+}
+
+.action-override {
+  grid-template-columns: minmax(120px, 160px) minmax(0, 1fr);
+}
+
+@media (max-width: 700px) {
+  .action-override {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Package 4.3 F10: model dropdowns, readiness next to a run choice, failed-run log lines. */
+.action-readiness {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}

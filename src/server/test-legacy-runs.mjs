@@ -10,6 +10,9 @@ import {
   parseLegacyRecord,
 } from './legacy-runs.mjs';
 
+// Test guard: a test never reaches the configured database (see src/lib/_database.mjs).
+process.env.CAREER_OPS_TEST_GUARD = '1';
+
 const NOW = Date.parse('2026-11-10T12:00:00.000Z');
 const iso = offsetMs => new Date(NOW + offsetMs).toISOString();
 

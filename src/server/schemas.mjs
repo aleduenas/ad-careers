@@ -96,6 +96,42 @@ const statusEnum = [
 const dateOrNull = { anyOf: [{ type: 'string', format: 'date' }, { type: 'null' }] };
 const nullableNumber = { anyOf: [{ type: 'number' }, { type: 'null' }] };
 
+// Latest posting check (D117), null when the job was never checked.
+const postingStates = ['open', 'closed', 'probably_closed', 'unknown'];
+const postingActions = ['none', 'flagged', 'discarded', 'held_back'];
+const postingItem = {
+  anyOf: [
+    { type: 'null' },
+    {
+      type: 'object',
+      additionalProperties: false,
+      required: ['state', 'action', 'checkedAt'],
+      properties: {
+        state: { type: 'string', enum: postingStates },
+        action: { type: 'string', enum: postingActions },
+        checkedAt: { type: 'string', format: 'date-time' },
+      },
+    },
+  ],
+};
+const postingDetail = {
+  anyOf: [
+    { type: 'null' },
+    {
+      type: 'object',
+      additionalProperties: false,
+      required: ['state', 'action', 'checkedAt', 'method', 'detail'],
+      properties: {
+        state: { type: 'string', enum: postingStates },
+        action: { type: 'string', enum: postingActions },
+        checkedAt: { type: 'string', format: 'date-time' },
+        method: { type: 'string' },
+        detail: { type: 'string' },
+      },
+    },
+  ],
+};
+
 const jobItem = {
   type: 'object',
   additionalProperties: false,
@@ -110,6 +146,10 @@ const jobItem = {
     'addedDate',
     'statusDate',
     'discardReason',
+    'favorite',
+    'yoeMin',
+    'yoeConfidence',
+    'posting',
     'salary',
     'compensation',
     'materials',
@@ -125,6 +165,13 @@ const jobItem = {
     addedDate: dateOrNull,
     statusDate: dateOrNull,
     discardReason: { anyOf: [{ type: 'string' }, { type: 'null' }] },
+    favorite: { type: 'boolean' },
+    // D116/D117. Always present; null means no estimate / no check.
+    yoeMin: { anyOf: [{ type: 'integer', minimum: 0, maximum: 40 }, { type: 'null' }] },
+    yoeConfidence: {
+      anyOf: [{ type: 'string', enum: ['high', 'medium', 'low', 'inferred'] }, { type: 'null' }],
+    },
+    posting: postingItem,
     salary: {
       anyOf: [
         { type: 'null' },
@@ -192,7 +239,10 @@ const jobsQuery = {
         'any',
       ],
     },
-    sort: { type: 'string', enum: ['score', 'statusDate', 'addedDate', 'company'] },
+    sort: {
+      type: 'string',
+      enum: ['score', 'statusDate', 'addedDate', 'company', 'favorite', 'yoe'],
+    },
     direction: { type: 'string', enum: ['asc', 'desc'] },
     grouped: { type: 'boolean' },
     limit: { type: 'integer', minimum: 1, maximum: 200 },
@@ -202,6 +252,12 @@ const jobsQuery = {
     scoreMin: { type: 'number', minimum: 0, maximum: 5 },
     scoreMax: { type: 'number', minimum: 0, maximum: 5 },
     addedWeek: { type: 'string', pattern: '^[0-9]{4}-W(0[1-9]|[1-4][0-9]|5[0-3])$' },
+    // Echoed only when the favorites-only flag is set.
+    favorite: { const: true },
+    // D116 / D117 filters, echoed only when set.
+    yoeMax: { type: 'integer', minimum: 0, maximum: 40 },
+    yoeUnknown: { const: 'exclude' },
+    posting: { type: 'string', enum: ['expired', 'applied-closed'] },
   },
 };
 
@@ -331,6 +387,7 @@ const jobDetailJob = {
     ...jobItem.properties,
     notes: { type: 'string' },
     evaluationError: { type: 'boolean' },
+    posting: postingDetail,
   },
 };
 
@@ -539,7 +596,7 @@ const runItem = {
     groupId: { anyOf: [{ type: 'string', format: 'uuid' }, { type: 'null' }] },
     action: {
       type: 'string',
-      enum: ['evaluate', 'cv', 'letter', 'scan', 'intake', 'publish', 'both'],
+      enum: ['evaluate', 'cv', 'letter', 'scan', 'intake', 'publish', 'both', 'liveness'],
     },
     jobId: { anyOf: [idString, { type: 'null' }] },
     state: { type: 'string', enum: ['queued', 'running', 'completed', 'failed', 'interrupted'] },
@@ -594,7 +651,59 @@ const runCreateRequest = {
         company: { type: 'string', minLength: 1, maxLength: 100 },
       },
     },
+    {
+      // Posting check: one job, or every eligible job when jobId is absent.
+      type: 'object',
+      additionalProperties: false,
+      required: ['action', 'requestKey'],
+      properties: {
+        action: { const: 'liveness' },
+        requestKey: runRequestKey,
+        jobId: { type: 'string', pattern: '^[1-9][0-9]{0,18}$' },
+      },
+    },
   ],
+};
+
+const livenessSummaryData = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['running', 'lastFullCheck'],
+  properties: {
+    running: { type: 'boolean' },
+    lastFullCheck: {
+      anyOf: [
+        { type: 'null' },
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: [
+            'finishedAt',
+            'checked',
+            'open',
+            'closed',
+            'probablyClosed',
+            'unknown',
+            'discarded',
+            'flagged',
+            'heldBack',
+          ],
+          properties: {
+            finishedAt: { type: 'string', format: 'date-time' },
+            checked: { type: 'integer', minimum: 0 },
+            open: { type: 'integer', minimum: 0 },
+            closed: { type: 'integer', minimum: 0 },
+            probablyClosed: { type: 'integer', minimum: 0 },
+            unknown: { type: 'integer', minimum: 0 },
+            discarded: { type: 'integer', minimum: 0 },
+            // Every flag, including the held-back ones; heldBack counts only those.
+            flagged: { type: 'integer', minimum: 0 },
+            heldBack: { type: 'integer', minimum: 0 },
+          },
+        },
+      ],
+    },
+  },
 };
 
 const letterPutRequest = {
@@ -647,6 +756,71 @@ const runCreateData = {
   properties: {
     runs: { type: 'array', minItems: 1, maxItems: 2, items: runItem },
     replayed: { type: 'boolean' },
+  },
+};
+
+const runBatchRequest = {
+  $id: 'https://career-ops.local/schemas/RunBatchRequest',
+  title: 'RunBatchRequest',
+  type: 'object',
+  additionalProperties: false,
+  required: ['requestKey'],
+  oneOf: [{ required: ['jobIds'] }, { required: ['next'] }],
+  properties: {
+    requestKey: runRequestKey,
+    jobIds: {
+      type: 'array',
+      minItems: 1,
+      maxItems: 100,
+      uniqueItems: true,
+      items: { type: 'string', pattern: '^[1-9][0-9]{0,18}$' },
+    },
+    next: { type: 'integer', minimum: 1, maximum: 100 },
+  },
+};
+
+const runBatchData = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['groupId', 'runs', 'skipped', 'replayed'],
+  properties: {
+    groupId: {
+      type: 'string',
+      pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    },
+    runs: { type: 'array', minItems: 1, maxItems: 100, items: runItem },
+    // A replay answers with the group's runs only; the skipped list is not stored.
+    skipped: {
+      type: 'array',
+      items: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['jobId', 'reason'],
+        properties: { jobId: idString, reason: { type: 'string' } },
+      },
+    },
+    replayed: { type: 'boolean' },
+  },
+};
+
+const runCancelQueuedRequest = {
+  $id: 'https://career-ops.local/schemas/RunCancelQueuedRequest',
+  title: 'RunCancelQueuedRequest',
+  type: 'object',
+  additionalProperties: false,
+  properties: {},
+};
+
+const runCancelQueuedData = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['groupId', 'cancelled'],
+  properties: {
+    groupId: {
+      type: 'string',
+      pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    },
+    cancelled: { type: 'integer', minimum: 0 },
   },
 };
 
@@ -752,6 +926,22 @@ const jobJdRequest = {
     expectedHash: { type: 'string', maxLength: 64 },
     text: { type: 'string', minLength: 1 },
   },
+};
+
+const jobFavoriteRequest = {
+  $id: 'https://career-ops.local/schemas/JobFavoriteRequest',
+  title: 'JobFavoriteRequest',
+  type: 'object',
+  additionalProperties: false,
+  required: ['favorite'],
+  properties: { favorite: { type: 'boolean' } },
+};
+
+const jobFavoriteData = {
+  type: 'object',
+  additionalProperties: false,
+  required: ['id', 'favorite'],
+  properties: { id: idString, favorite: { type: 'boolean' } },
 };
 
 const jobWriteData = {
@@ -1230,11 +1420,14 @@ export const publicSchemas = Object.freeze({
   JobsResponse: successSchema('JobsResponse', jobsData),
   OverviewResponse: successSchema('OverviewResponse', overviewData),
   JobDetailResponse: successSchema('JobDetailResponse', jobDetailData),
+  LivenessSummaryResponse: successSchema('LivenessSummaryResponse', livenessSummaryData),
   JobMaterialParams: jobMaterialParams,
   JobStatusRequest: jobStatusRequest,
   JobMetadataRequest: jobMetadataRequest,
   JobJdRequest: jobJdRequest,
   JobWriteResponse: successSchema('JobWriteResponse', jobWriteData),
+  JobFavoriteRequest: jobFavoriteRequest,
+  JobFavoriteResponse: successSchema('JobFavoriteResponse', jobFavoriteData),
   JobJdWriteResponse: successSchema('JobJdWriteResponse', jobJdWriteData),
   ProvidersSettingsResponse: successSchema('ProvidersSettingsResponse', providersSettingsData),
   ProvidersPutRequest: providersPutRequest,
@@ -1255,6 +1448,10 @@ export const publicSchemas = Object.freeze({
   LetterResponse: successSchema('LetterResponse', letterData),
   RunCreateRequest: runCreateRequest,
   RunCreateResponse: successSchema('RunCreateResponse', runCreateData),
+  RunBatchRequest: runBatchRequest,
+  RunBatchResponse: successSchema('RunBatchResponse', runBatchData),
+  RunCancelQueuedRequest: runCancelQueuedRequest,
+  RunCancelQueuedResponse: successSchema('RunCancelQueuedResponse', runCancelQueuedData),
   RunsResponse: successSchema('RunsResponse', runsData),
   RunResponse: successSchema('RunResponse', runData),
   RunLogResponse: successSchema('RunLogResponse', runLogData),

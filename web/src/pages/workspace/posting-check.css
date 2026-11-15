@@ -1,0 +1,29 @@
+/* Posting check and experience lines in the job page facts and the Status panel. */
+
+.ws-facts .posting-fact-action,
+.ws-facts .posting-fact-note {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.ws-facts .posting-check-button {
+  min-height: 30px;
+  margin-top: 4px;
+  padding: 3px 9px;
+  font-size: 12px;
+}
+
+.ws-facts .posting-fact-note {
+  margin-top: 2px;
+}
+
+.posting-expired {
+  margin: 0 0 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--orange);
+  border-radius: 9px;
+  background: var(--orange-bg);
+  color: var(--orange);
+  font-size: 12px;
+}

@@ -109,6 +109,7 @@ try {
       !/browser_runs/.test(e.message),
   );
   assert.equal((await store.getByRequestKey(first.requestKey)).id, first.id);
+  assert.deepEqual(await store.listByGroup(randomUUID()), [], 'an unknown group has no runs');
   await assert.rejects(store.insert(draft({ jobId: '987654321' })), e => e.code === 'UNKNOWN_JOB');
   await assert.rejects(store.insert(draft({ jobId: 'abc' })), e => e.code === 'INVALID_ARGUMENT');
   await assert.rejects(

@@ -54,7 +54,46 @@ const JDS_DIR = 'data/jds';
 // Ensure required directories exist (fresh setup)
 mkdirSync('data', { recursive: true });
 
-const CONCURRENCY = 10;
+// Every service gets its own lane and all lanes run at the same time; inside a lane companies
+// run with that lane's concurrency (default 1). A provider may declare `lane(entry)` and
+// `laneConcurrency`. Providers whose entries are separate tenants on different hosts get one
+// lane per tenant.
+const DEFAULT_LANE_CONCURRENCY = 1;
+const LANE_CONCURRENCY = { greenhouse: 4, ashby: 4, lever: 4 };
+const TENANT_LANES = new Set(['workday', 'successfactors', 'icims', 'pinpoint', 'breezy']);
+
+export function laneKey(provider, entry) {
+  const declared = provider.lane?.(entry);
+  if (declared) return String(declared);
+  if (!TENANT_LANES.has(provider.id)) return provider.id;
+  let tenant = entry.workday_tenant
+    ? `${entry.workday_tenant}.${entry.workday_host || ''}`
+    : entry.breezy_board || null;
+  if (!tenant) {
+    try {
+      tenant = new URL(entry.api || entry.careers_url || (entry.job_urls || [])[0]).hostname;
+    } catch {
+      tenant = entry.name;
+    }
+  }
+  return `${provider.id}:${tenant}`.toLowerCase();
+}
+
+export function laneConcurrency(provider) {
+  return provider.laneConcurrency ?? LANE_CONCURRENCY[provider.id] ?? DEFAULT_LANE_CONCURRENCY;
+}
+
+// items: [{ provider, entry, task }]. Runs every lane at once; tasks must isolate their own errors.
+export async function runLanes(items) {
+  const lanes = new Map();
+  for (const item of items) {
+    const key = laneKey(item.provider, item.entry);
+    if (!lanes.has(key)) lanes.set(key, { limit: laneConcurrency(item.provider), tasks: [] });
+    lanes.get(key).tasks.push(item.task);
+  }
+  await Promise.all([...lanes.values()].map(lane => parallelFetch(lane.tasks, lane.limit)));
+  return lanes.size;
+}
 
 // ── JD caching ──────────────────────────────────────────────────────
 
@@ -183,6 +222,7 @@ export function buildTitleFilter(titleFilter, additionalPositive = []) {
   const negative = (titleFilter?.negative || []).map(buildNegativeMatcher);
 
   return title => {
+    if (typeof title !== 'string') return false;
     const lower = title.toLowerCase();
     const hasPositive = positive.length === 0 || positive.some(matcher => matcher(lower));
     const hasNegative = negative.some(matcher => matcher(lower));
@@ -234,7 +274,8 @@ export function buildLocationFilter(locationFilter) {
   const block = (locationFilter.block || []).map(k => k.toLowerCase());
 
   return location => {
-    if (!location) return true;
+    // Missing or non-string locations are unknown, never an error.
+    if (!location || typeof location !== 'string') return true;
     const lower = location.toLowerCase();
     if (block.length > 0 && block.some(k => lower.includes(k))) return false;
     if (allow.length === 0) return true;
@@ -331,6 +372,86 @@ async function parallelFetch(tasks, limit) {
   const workers = Array.from({ length: Math.min(limit, tasks.length) }, () => next());
   await Promise.all(workers);
   return results;
+}
+
+// Dedup, filter, gate and collect one provider's postings. `run` carries the shared seen-sets,
+// counters and outputs (mutated from concurrent tasks; the event loop is single-threaded).
+export async function processJobs({ provider, jobs, titleFilter, locationFilter, run }) {
+  const appendHistory = run.appendHistory ?? appendToScanHistory;
+  const save = run.saveJd ?? saveJd;
+  const counts = run.counts;
+  for (const job of jobs) {
+    const source = `${provider.id}-api`;
+    if (!titleFilter(job.title)) {
+      counts.filteredTitle++;
+      run.seenUrls.add(job.url);
+      if (!run.dryRun) await appendHistory([{ ...job, source }], run.date, 'skipped_title');
+      continue;
+    }
+    if (!locationFilter(job.location)) {
+      counts.filteredLocation++;
+      run.seenUrls.add(job.url);
+      if (!run.dryRun) await appendHistory([{ ...job, source }], run.date, 'skipped_location');
+      continue;
+    }
+    if (run.seenUrls.has(job.url)) {
+      counts.dupes++;
+      continue;
+    }
+    const key = companyRoleKey(job.company, job.title);
+    if (run.seenCompanyRoles.has(key)) {
+      counts.dupes++;
+      continue;
+    }
+    const substantiveContent = htmlToText(job.content || '').trim();
+    if (substantiveContent.length < 300) {
+      counts.missingContent++;
+      if (run.missingFullJd.length < 500)
+        run.missingFullJd.push({ company: job.company, title: job.title, url: job.url });
+      continue;
+    }
+    job.content = substantiveContent;
+    // Mark as seen to avoid intra-scan dupes
+    run.seenUrls.add(job.url);
+    run.seenCompanyRoles.add(key);
+    // Cache JD before gate so the gate can read the full text
+    if (!run.dryRun)
+      save(job.company, job.title, job.url, job.content, source, run.date, job.location || '');
+
+    // Location gate — read back the file we just wrote (or use inline content)
+    const jdText = job.content || null;
+    const gateResult = gate(job.url, job.company, job.title, jdText, job.location || '');
+    if (gateResult.decision === 'FAIL') {
+      counts.gateFailed++;
+      // Write to scan-history with location-fail so it won't resurface next scan
+      if (!run.dryRun)
+        await appendHistory(
+          [{ ...job, source, location: job.location || '' }],
+          run.date,
+          'location-fail',
+        );
+      continue;
+    }
+
+    run.newOffers.push({ ...job, source });
+  }
+}
+
+// Direct employer sources win over aggregators (provider.aggregator) for the same company and
+// role: an aggregator task may fetch at any time but waits here before processing its postings
+// until every direct task has finished, whichever lane finishes first. Each task calls
+// `finish(provider)` when done (also on error).
+export function directFirstGate(providers) {
+  let pending = providers.filter(p => !p.aggregator).length;
+  let release;
+  const direct = new Promise(resolve => (release = resolve));
+  if (pending === 0) release();
+  return {
+    waitForDirect: provider => (provider.aggregator ? direct : undefined),
+    finish: provider => {
+      if (!provider.aggregator && --pending === 0) release();
+    },
+  };
 }
 
 // ── Main ────────────────────────────────────────────────────────────
@@ -447,16 +568,30 @@ async function main() {
 
   // 5. Fetch from each target
   const date = new Date().toISOString().slice(0, 10);
-  let totalFound = 0;
-  let totalFilteredTitle = 0;
-  let totalFilteredLocation = 0;
-  let totalDupes = 0;
-  let totalGateFailed = 0;
-  let totalMissingContent = 0;
   // Postings deferred for lack of a full JD, for the report (bounded so a bad portal cannot bloat it).
   const missingFullJd = [];
   const newOffers = [];
   const errors = [...resolveErrors];
+  const counts = {
+    found: 0,
+    filteredTitle: 0,
+    filteredLocation: 0,
+    dupes: 0,
+    gateFailed: 0,
+    missingContent: 0,
+  };
+  const run = { seenUrls, seenCompanyRoles, dryRun, date, counts, missingFullJd, newOffers };
+
+  const trackedEntries = Object.freeze(
+    companies.filter(
+      c => c.enabled !== false && !['board-sweep', 'himalayas'].includes(c.provider),
+    ),
+  );
+
+  // Direct employer sources win over aggregators for the same company and role: an aggregator
+  // task fetches concurrently but waits to process its postings until every direct task is done,
+  // whichever lane finishes first.
+  const directGate = directFirstGate(targets.map(company => company._provider));
 
   const tasks = targets.map(company => async () => {
     const provider = company._provider;
@@ -466,6 +601,11 @@ async function main() {
       : titleFilter;
     const ctx = makeHttpCtx();
     ctx.dryRun = dryRun;
+    // Read-only view of the enabled tracked entries, so a discovery provider can skip boards that
+    // already have their own entry.
+    ctx.trackedEntries = trackedEntries;
+    // Title and location filters only (no seen-check): discovery providers return just these.
+    ctx.passesFilters = job => companyTitleFilter(job.title) && locationFilter(job.location);
     ctx.shouldFetchContent = job => {
       if (!companyTitleFilter(job.title) || !locationFilter(job.location)) return false;
       if (seenUrls.has(job.url)) return false;
@@ -479,71 +619,28 @@ async function main() {
       }
       company._coverage.jobs_found = jobs.length;
       company._coverage.status = jobs.length > 0 ? 'ok' : 'empty';
-      totalFound += jobs.length;
+      counts.found += jobs.length;
 
-      for (const job of jobs) {
-        const source = `${provider.id}-api`;
-        if (!companyTitleFilter(job.title)) {
-          totalFilteredTitle++;
-          seenUrls.add(job.url);
-          if (!dryRun) await appendToScanHistory([{ ...job, source }], date, 'skipped_title');
-          continue;
-        }
-        if (!locationFilter(job.location)) {
-          totalFilteredLocation++;
-          seenUrls.add(job.url);
-          if (!dryRun) await appendToScanHistory([{ ...job, source }], date, 'skipped_location');
-          continue;
-        }
-        if (seenUrls.has(job.url)) {
-          totalDupes++;
-          continue;
-        }
-        const key = companyRoleKey(job.company, job.title);
-        if (seenCompanyRoles.has(key)) {
-          totalDupes++;
-          continue;
-        }
-        const substantiveContent = htmlToText(job.content || '').trim();
-        if (substantiveContent.length < 300) {
-          totalMissingContent++;
-          if (missingFullJd.length < 500)
-            missingFullJd.push({ company: job.company, title: job.title, url: job.url });
-          continue;
-        }
-        job.content = substantiveContent;
-        // Mark as seen to avoid intra-scan dupes
-        seenUrls.add(job.url);
-        seenCompanyRoles.add(key);
-        // Cache JD before gate so the gate can read the full text
-        if (!dryRun)
-          saveJd(job.company, job.title, job.url, job.content, source, date, job.location || '');
-
-        // Location gate — read back the file we just wrote (or use inline content)
-        const jdText = job.content || null;
-        const gateResult = gate(job.url, job.company, job.title, jdText, job.location || '');
-        if (gateResult.decision === 'FAIL') {
-          totalGateFailed++;
-          // Write to scan-history with location-fail so it won't resurface next scan
-          if (!dryRun)
-            await appendToScanHistory(
-              [{ ...job, source, location: job.location || '' }],
-              date,
-              'location-fail',
-            );
-          continue;
-        }
-
-        newOffers.push({ ...job, source });
-      }
+      await directGate.waitForDirect(provider);
+      await processJobs({
+        provider,
+        jobs,
+        titleFilter: companyTitleFilter,
+        locationFilter,
+        run,
+      });
     } catch (err) {
       company._coverage.status = 'error';
       company._coverage.reason = err.message;
       errors.push({ company: company.name, error: err.message });
+    } finally {
+      directGate.finish(provider);
     }
   });
 
-  await parallelFetch(tasks, CONCURRENCY);
+  await runLanes(
+    targets.map((company, i) => ({ provider: company._provider, entry: company, task: tasks[i] })),
+  );
 
   // 6. Write results
   if (!dryRun && newOffers.length > 0) {
@@ -556,12 +653,12 @@ async function main() {
   console.log(`Portal Scan — ${date}`);
   console.log(`${'━'.repeat(45)}`);
   console.log(`Companies scanned:     ${targets.length}`);
-  console.log(`Total jobs found:      ${totalFound}`);
-  console.log(`Filtered by title:     ${totalFilteredTitle} removed`);
-  console.log(`Filtered by location:  ${totalFilteredLocation} removed`);
-  console.log(`Already tracked:       ${totalDupes} skipped`);
-  console.log(`Location gate failed:  ${totalGateFailed} blocked`);
-  console.log(`Missing full JD:       ${totalMissingContent} deferred`);
+  console.log(`Total jobs found:      ${counts.found}`);
+  console.log(`Filtered by title:     ${counts.filteredTitle} removed`);
+  console.log(`Filtered by location:  ${counts.filteredLocation} removed`);
+  console.log(`Already tracked:       ${counts.dupes} skipped`);
+  console.log(`Location gate failed:  ${counts.gateFailed} blocked`);
+  console.log(`Missing full JD:       ${counts.missingContent} deferred`);
   console.log(`New offers added:      ${newOffers.length}`);
 
   if (richOnly.length > 0) {
@@ -610,9 +707,9 @@ async function main() {
         ok: coverage.filter(row => row.status === 'ok').length,
         empty: coverage.filter(row => row.status === 'empty').length,
         error: coverage.filter(row => row.status === 'error').length,
-        jobs_found: totalFound,
+        jobs_found: counts.found,
         new_offers: newOffers.length,
-        missing_full_jd: totalMissingContent,
+        missing_full_jd: counts.missingContent,
       },
       missing: missingFullJd,
       companies: coverage,

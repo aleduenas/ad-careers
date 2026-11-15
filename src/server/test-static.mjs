@@ -8,6 +8,9 @@ import { createServer } from 'node:net';
 import { createApp } from './app.mjs';
 import { createStaticHandler, HTML_CSP, isInsideDirectory } from './static.mjs';
 
+// Test guard: a test never reaches the configured database (see src/lib/_database.mjs).
+process.env.CAREER_OPS_TEST_GUARD = '1';
+
 test('serves only regular files under its canonical dist root and SPA paths use index', async t => {
   assert.equal(isInsideDirectory('C:\\build\\dist', 'D:\\outside\\index.html', win32), false);
   assert.equal(isInsideDirectory('C:\\build\\dist', 'C:\\build\\dist\\assets.js', win32), true);

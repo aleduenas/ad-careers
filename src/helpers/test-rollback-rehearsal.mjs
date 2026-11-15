@@ -1,5 +1,5 @@
 // Rehearses the additive-schema rollback of migrations 009 and 010 documented in
-// documentation/dashboard-migration/design/ROLLBACK.md. The SQL that is rolled back is read from
+// notes/dashboard-migration/design/ROLLBACK.md. The SQL that is rolled back is read from
 // that page, so the documented procedure is the tested procedure. Runs only in a unique schema of
 // the isolated test database; the personal database is never touched.
 import assert from 'node:assert/strict';
@@ -39,10 +39,7 @@ function rollbackBlock(markdown, id) {
   return match[1];
 }
 
-const page = readFileSync(
-  join(root, 'documentation/dashboard-migration/design/ROLLBACK.md'),
-  'utf8',
-);
+const page = readFileSync(join(root, 'notes/dashboard-migration/design/ROLLBACK.md'), 'utf8');
 const rollback010 = rollbackBlock(page, '010');
 const rollback009 = rollbackBlock(page, '009');
 

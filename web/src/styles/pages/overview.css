@@ -1,0 +1,144 @@
+/* The overview page. */
+
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 13px;
+}
+
+.metric-card,
+.panel-card,
+.empty-state {
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--paper);
+  box-shadow: 0 2px 8px rgb(20 40 30 / 4%);
+}
+
+.metric-card {
+  display: grid;
+  gap: 7px;
+  padding: 18px;
+}
+
+.metric-card span {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.metric-card strong {
+  font-size: 26px;
+  line-height: 1.2;
+  font-variant-numeric: tabular-nums;
+}
+
+.overview-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+  gap: 16px;
+}
+
+.status-counts > div,
+.bucket-list > div,
+.weekly-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.status-counts > div:last-child,
+.bucket-list > div:last-child,
+.weekly-list > div:last-child {
+  border-bottom: 0;
+}
+
+.status-counts strong,
+.bucket-list strong,
+.weekly-list strong {
+  font-variant-numeric: tabular-nums;
+}
+
+.funnel-list {
+  display: grid;
+  gap: 13px;
+}
+
+.funnel-row > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 5px;
+}
+
+.funnel-row > div span {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.funnel-row progress {
+  display: block;
+  width: 100%;
+  height: 9px;
+  accent-color: var(--green);
+}
+
+.rate-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 18px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.rate-row strong {
+  margin-left: 4px;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 900px) {
+  .metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .overview-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Package 4.3 deltas (F3, F6, F8, F9). */
+.overview-link {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 8px;
+  margin: 0 -8px;
+  border-bottom: 1px solid var(--line);
+  border-radius: 6px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.bucket-list > a:last-child,
+.weekly-list > a:last-child {
+  border-bottom: 0;
+}
+
+.overview-link:hover {
+  background: var(--paper-soft);
+}
+
+.overview-link span {
+  text-decoration: underline;
+  text-decoration-color: var(--line);
+  text-underline-offset: 3px;
+}
+
+.overview-link strong {
+  font-variant-numeric: tabular-nums;
+}
