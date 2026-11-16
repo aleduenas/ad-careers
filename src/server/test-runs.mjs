@@ -1131,6 +1131,43 @@ test('redactLog removes credentials, env assignments, tokens and private paths',
   assert.equal(redactLog('\u001b[32mgreen\u001b[0m', { rootDir: '/x-root' }), 'green');
 });
 
+test('redactLog keeps long forward-slash paths readable and still hides keys', () => {
+  const opts = { rootDir: '/nonexistent-root' };
+  // On Linux and macOS a path is one unbroken run of token characters; it is not a secret.
+  for (const line of [
+    'synthetic launcher <repo>/output/acme-corp/security-engineer--1234/cover-letter.md run=1',
+    'wrote <repo>/logs/evaluation/2026-11-15T17-35-46-911Z-c695a887/1597/gate.prompt.txt',
+    'reading src/scan/providers/_canonical-jd.mjs and src/server/test-runs-service-database.mjs',
+    'pdf at output/example-company/senior-platform-engineer--42/cv-structured.pdf',
+    'folder output/example-company/senior-platform-engineer--42/drafts is ready',
+    'copied to /var/tmp/career-ops-export/example-company/cover-letter-final.md',
+  ])
+    assert.equal(redactLog(line, opts), line, line);
+  // A repository under the real root is still relabelled, with the rest of the path kept.
+  assert.equal(
+    redactLog('saved /srv/app/output/acme/security-engineer--1234/cover-letter.md', {
+      rootDir: '/srv/app',
+    }),
+    'saved <repo>/output/acme/security-engineer--1234/cover-letter.md',
+  );
+  // Keys stay hidden: bare, base64 with a slash, plus or padding, or sitting inside a path.
+  for (const [input, forbidden] of [
+    ['key Zm9vYmFyYmF6cXV4Zm9vYmFyYmF6cXV4Zm9vYmFyYmF6cXV4', 'Zm9vYmFy'],
+    ['key Zm9vYmFyYmF6/XV4Zm9vYmFyYmF6+XV4Zm9vYmFyYmF6cXV4Zm8=', 'Zm9vYmFy'],
+    ['key aB3dE5gH7jK9mN1pQ3sT5vX7/zA9cE1gI3kM5oQ7sU9wY1bD3fH5', 'aB3dE5gH7jK9'],
+    // A cloud-style secret key with a slash, and a random key broken into short pieces: neither
+    // starts with a repository folder nor ends in a file extension.
+    ['aws wJalrXUtnFEMI/K7MDENG/bPxRfiCYzEXAMPLEKEYab', 'wJalrXUtnFEMI'],
+    ['key q7Rk2Lm9/Xp4Tz8Vb1/Nc6Hd3Yf0/Gw5Js2Ua7/Ei9Ko4Pl1Mz', 'q7Rk2Lm9'],
+    ['file tmp/cache/aB3dE5gH7jK9mN1pQ3sT5vX7zA9cE1gI/result-of-the-run.json', 'aB3dE5gH7jK9'],
+    [
+      'file tmp/abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwx/out.json',
+      'abcdefghijklmnopqrstuvwxyzabcdefghijklmnopqrstuvwx',
+    ],
+  ])
+    assert.equal(redactLog(input, opts).includes(forbidden), false, input);
+});
+
 test('wire runs never carry the pid or log reference and keep only well-formed selection entries', () => {
   const wire = toWireRun({
     id: 'a',

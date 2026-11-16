@@ -278,8 +278,44 @@ export function redactLog(text, { rootDir = repositoryRoot } = {}) {
         '[redacted]',
       )
       .replace(/\b[A-Fa-f0-9]{32,}\b/g, '[redacted]')
-      .replace(/\b[A-Za-z0-9+/_-]{40,}={0,2}/g, '[redacted]')
+      .replace(/\b[A-Za-z0-9+/_-]{40,}={0,2}/g, (token, offset, whole) =>
+        isPathLike(token, whole.slice(offset + token.length, offset + token.length + 10))
+          ? token
+          : '[redacted]',
+      )
   );
+}
+
+// A long run of token characters is a secret unless it reads as a file path: slash-separated
+// pieces, no base64 '+' or '=' anywhere, no piece that could be a key by itself (40 or more
+// characters, or 24 or more unbroken letters and digits mixing upper case, lower case and
+// digits), and either a first piece that is one of this repository's folders or a file
+// extension straight after the token (the dot is not a token character, so it is read from
+// the text that follows). A bare base64 key that merely contains a slash meets neither, so it
+// is still hidden. Without this every long forward-slash path was blanked on Linux and macOS,
+// where the separator is one of the token characters; Windows paths were spared only by their
+// backslashes.
+const PATH_ROOTS = new Set([
+  'src',
+  'web',
+  'infra',
+  'llm',
+  'config',
+  'data',
+  'output',
+  'logs',
+  'notes',
+  'node_modules',
+]);
+function isPathLike(token, after = '') {
+  if (!token.includes('/') || /[+=]/.test(token)) return false;
+  const pieces = token.split('/');
+  const plain = pieces.every(piece => {
+    if (piece.length >= 40) return false;
+    const run = /[A-Za-z0-9]{24,}/.exec(piece)?.[0];
+    return !(run && /[a-z]/.test(run) && /[A-Z]/.test(run) && /[0-9]/.test(run));
+  });
+  return plain && (PATH_ROOTS.has(pieces[0]) || /^\.[A-Za-z0-9]{1,8}(?![A-Za-z0-9])/.test(after));
 }
 
 // Start time of a live process, or null when it cannot be read. Only Windows is supported (a
